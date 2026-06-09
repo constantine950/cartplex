@@ -1,17 +1,6 @@
-# CartPlex — Product Requirements Document
-
-**Version:** 1.0  
-**Date:** 2025-06-01  
-**Author:** James Adebeshin  
-**Status:** Draft
-
----
-
 ## 1. Overview
 
-CartPlex is a headless multi-vendor commerce engine. It enables independent vendors to list and sell products through a shared marketplace storefront, with the marketplace operator earning a platform fee on every transaction. All commerce operations are exposed via a GraphQL API, making the frontend fully decoupled and replaceable.
-
----
+## CartPlex is a headless multi-vendor commerce engine. It enables independent vendors to list and sell products through a shared marketplace storefront, with the marketplace operator earning a platform fee on every transaction. All commerce operations are exposed via a GraphQL API, making the frontend fully decoupled and replaceable.
 
 ## 2. Actors
 

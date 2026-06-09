@@ -1,0 +1,15 @@
+node_modules/
+dist/
+build/
+.next/
+out/
+.env
+.env.local
+.env.*.local
+*.log
+npm-debug.log*
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+prisma/migrations/dev.db
