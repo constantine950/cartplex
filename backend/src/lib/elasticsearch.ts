@@ -2,7 +2,9 @@ import { Client } from "@elastic/elasticsearch";
 import { config } from "../config/index.js";
 import { logger } from "../utils/logger.js";
 
-export const esClient = new Client({ node: config.elasticsearch.url });
+export const esClient = new Client({
+  node: config.elasticsearch.url,
+});
 
 export async function pingElasticsearch(): Promise<void> {
   try {
@@ -11,7 +13,9 @@ export async function pingElasticsearch(): Promise<void> {
       `Elasticsearch connected — cluster: ${info.cluster_name}, version: ${info.version.number}`,
     );
   } catch (err) {
-    logger.error("Elasticsearch connection failed", { err });
-    throw err;
+    // Log but don't crash — ES may still be initialising
+    logger.warn("Elasticsearch ping failed, will retry on first query", {
+      message: err instanceof Error ? err.message : String(err),
+    });
   }
 }

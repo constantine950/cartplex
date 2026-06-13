@@ -1,7 +1,7 @@
 FROM oven/bun:1 AS base
 WORKDIR /app
 COPY package.json bun.lock* ./
-RUN bun install
+RUN bun install --trust-all-plugins
 
 FROM base AS development
 COPY . .
@@ -17,7 +17,7 @@ RUN bun build src/index.ts --outdir dist --target node
 FROM oven/bun:1 AS production
 WORKDIR /app
 COPY package.json bun.lock* ./
-RUN bun install --production
+RUN bun install --production --trust-all-plugins
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY prisma ./prisma

@@ -13,7 +13,6 @@ import { connectRedis } from "./lib/redis.js";
 import { pingElasticsearch } from "./lib/elasticsearch.js";
 import { resolvers } from "./graphql/resolvers/index.js";
 
-// Placeholder — real schema loaded on Day 4
 const typeDefs = `#graphql
   type Query {
     _health: String
@@ -27,7 +26,7 @@ export interface ApolloContext {
 
 async function bootstrap() {
   await connectRedis();
-  await pingElasticsearch();
+  await pingElasticsearch(); // non-fatal now
   await prisma.$connect();
   logger.info("Database connected");
 
@@ -66,6 +65,8 @@ async function bootstrap() {
 }
 
 bootstrap().catch((err) => {
-  logger.error("Failed to start server", { err });
+  logger.error("Failed to start server", {
+    err: err instanceof Error ? err.message : err,
+  });
   process.exit(1);
 });

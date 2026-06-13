@@ -7,18 +7,16 @@ export const prisma =
   globalForPrisma.prisma ??
   new PrismaClient({
     log: [
-      { level: "query", emit: "event" },
       { level: "error", emit: "stdout" },
       { level: "warn", emit: "stdout" },
     ],
   });
 
-prisma.$on("query", (e: { duration: number; query: string }) => {
-  if (process.env.NODE_ENV === "development") {
-    logger.debug(`Prisma query (${e.duration}ms): ${e.query}`);
-  }
-});
-
 if (process.env.NODE_ENV !== "production") {
   globalForPrisma.prisma = prisma;
+}
+
+export async function connectDB() {
+  await prisma.$connect();
+  logger.info("Database connected");
 }

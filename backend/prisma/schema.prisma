@@ -1,0 +1,227 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id @default(uuid())
+  email         String   @unique
+  passwordHash  String
+  name          String
+  role          UserRole @default(BUYER)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  vendor  Vendor?
+  orders  Order[]
+  reviews Review[]
+  cart    Cart?
+}
+
+enum UserRole {
+  BUYER
+  VENDOR
+  ADMIN
+}
+
+model Vendor {
+  id                   String       @id @default(uuid())
+  userId               String       @unique
+  name                 String
+  slug                 String       @unique
+  description          String?
+  bannerUrl            String?
+  logoUrl              String?
+  status               VendorStatus @default(PENDING)
+  stripeAccountId      String?
+  stripeOnboardingDone Boolean      @default(false)
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+
+  user       User        @relation(fields: [userId], references: [id])
+  products   Product[]
+  orderItems OrderItem[]
+  payouts    Payout[]
+}
+
+enum VendorStatus {
+  PENDING
+  APPROVED
+  SUSPENDED
+}
+
+model Product {
+  id          String   @id @default(uuid())
+  vendorId    String
+  name        String
+  slug        String   @unique
+  description String?
+  category    String
+  tags        String[]
+  basePrice   Decimal  @db.Decimal(10, 2)
+  images      String[]
+  isActive    Boolean  @default(true)
+  avgRating   Decimal  @default(0) @db.Decimal(3, 2)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  vendor   Vendor           @relation(fields: [vendorId], references: [id])
+  variants ProductVariant[]
+  reviews  Review[]
+}
+
+model ProductVariant {
+  id                String   @id @default(uuid())
+  productId         String
+  sku               String   @unique
+  options           Json
+  priceModifier     Decimal  @default(0) @db.Decimal(10, 2)
+  inventoryCount    Int      @default(0)
+  lowStockThreshold Int      @default(5)
+  backorderEnabled  Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  product    Product     @relation(fields: [productId], references: [id])
+  inventory  Inventory[]
+  orderItems OrderItem[]
+}
+
+model Inventory {
+  id        String          @id @default(uuid())
+  variantId String
+  delta     Int
+  reason    InventoryReason
+  createdAt DateTime        @default(now())
+
+  variant ProductVariant @relation(fields: [variantId], references: [id])
+}
+
+enum InventoryReason {
+  SALE
+  RESTOCK
+  ADJUSTMENT
+  RESERVED
+  RELEASED
+}
+
+model Cart {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  sessionId String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model Order {
+  id                    String      @id @default(uuid())
+  buyerId               String
+  status                OrderStatus @default(PENDING_PAYMENT)
+  subtotal              Decimal     @db.Decimal(10, 2)
+  discountAmount        Decimal     @default(0) @db.Decimal(10, 2)
+  shippingAmount        Decimal     @default(0) @db.Decimal(10, 2)
+  taxAmount             Decimal     @default(0) @db.Decimal(10, 2)
+  total                 Decimal     @db.Decimal(10, 2)
+  stripePaymentIntentId String?
+  couponId              String?
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+
+  buyer   User        @relation(fields: [buyerId], references: [id])
+  coupon  Coupon?     @relation(fields: [couponId], references: [id])
+  items   OrderItem[]
+  payouts Payout[]
+}
+
+enum OrderStatus {
+  PENDING_PAYMENT
+  PAID
+  FULFILLING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  REFUNDED
+}
+
+model OrderItem {
+  id        String  @id @default(uuid())
+  orderId   String
+  vendorId  String
+  variantId String
+  quantity  Int
+  unitPrice Decimal @db.Decimal(10, 2)
+  lineTotal Decimal @db.Decimal(10, 2)
+
+  order   Order          @relation(fields: [orderId], references: [id])
+  vendor  Vendor         @relation(fields: [vendorId], references: [id])
+  variant ProductVariant @relation(fields: [variantId], references: [id])
+}
+
+model Coupon {
+  id                  String     @id @default(uuid())
+  code                String     @unique
+  type                CouponType
+  value               Decimal    @db.Decimal(10, 2)
+  minOrderValue       Decimal?   @db.Decimal(10, 2)
+  appliesToProductIds String[]
+  appliesToVendorIds  String[]
+  usageLimit          Int?
+  usageCount          Int        @default(0)
+  expiresAt           DateTime?
+  isActive            Boolean    @default(true)
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+
+  orders Order[]
+}
+
+enum CouponType {
+  PERCENTAGE
+  FIXED_AMOUNT
+  FREE_SHIPPING
+  BOGO
+}
+
+model Payout {
+  id               String       @id @default(uuid())
+  vendorId         String
+  orderId          String
+  grossAmount      Decimal      @db.Decimal(10, 2)
+  platformFee      Decimal      @db.Decimal(10, 2)
+  netAmount        Decimal      @db.Decimal(10, 2)
+  stripeTransferId String?
+  status           PayoutStatus @default(PENDING)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  vendor Vendor @relation(fields: [vendorId], references: [id])
+  order  Order  @relation(fields: [orderId], references: [id])
+}
+
+enum PayoutStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+model Review {
+  id               String   @id @default(uuid())
+  buyerId          String
+  productId        String
+  rating           Int
+  text             String?
+  verifiedPurchase Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  buyer   User    @relation(fields: [buyerId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+
+  @@unique([buyerId, productId])
+}
