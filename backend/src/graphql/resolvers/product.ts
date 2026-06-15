@@ -1,113 +1,152 @@
 import { prisma } from "../../lib/prisma.js";
-import { requireAuth, requireVendor } from "../../middleware/auth.js";
+import { requireVendor } from "../../middleware/auth.js";
+import { syncProductToES, bulkSyncAllProducts } from "../../services/search.js";
+import { searchProducts } from "../../lib/elasticsearch.js";
 import type { ApolloContext } from "../types/index.js";
 
 export const productResolvers = {
   Query: {
-    // ── List products with filters + pagination ────────────────
     products: async (_: unknown, { filter = {} }: { filter: any }) => {
-      const {
-        category,
-        vendorId,
-        minPrice,
-        maxPrice,
-        inStock,
-        tags,
-        sortBy = "NEWEST",
-        page = 1,
-        perPage = 20,
-      } = filter;
+      try {
+        const {
+          search,
+          category,
+          vendorId,
+          minPrice,
+          maxPrice,
+          inStock,
+          tags,
+          sortBy = "NEWEST",
+          page = 1,
+          perPage = 20,
+        } = filter;
 
-      const where: any = { isActive: true };
+        // ── Use Elasticsearch if search or filters present ────
+        const useES = !!(
+          search ||
+          category ||
+          vendorId ||
+          minPrice !== undefined ||
+          maxPrice !== undefined ||
+          inStock !== undefined ||
+          tags?.length
+        );
 
-      if (category) where.category = category;
-      if (vendorId) where.vendorId = vendorId;
-      if (tags?.length) where.tags = { hasSome: tags };
-      if (minPrice !== undefined || maxPrice !== undefined) {
-        where.basePrice = {};
-        if (minPrice !== undefined) where.basePrice.gte = minPrice;
-        if (maxPrice !== undefined) where.basePrice.lte = maxPrice;
-      }
-      if (inStock) {
-        where.variants = { some: { inventoryCount: { gt: 0 } } };
-      }
+        if (useES) {
+          try {
+            const esResult = await searchProducts({
+              search,
+              category,
+              vendorId,
+              minPrice,
+              maxPrice,
+              inStock,
+              tags,
+              sortBy,
+              page,
+              perPage,
+            });
 
-      const orderBy = (() => {
-        switch (sortBy) {
-          case "PRICE_ASC":
-            return { basePrice: "asc" as const };
-          case "PRICE_DESC":
-            return { basePrice: "desc" as const };
-          case "BEST_RATED":
-            return { avgRating: "desc" as const };
-          default:
-            return { createdAt: "desc" as const };
+            const products = await prisma.product.findMany({
+              where: { id: { in: esResult.ids } },
+              include: { vendor: true, variants: true },
+            });
+
+            const sorted = esResult.ids
+              .map((id) => products.find((p) => p.id === id))
+              .filter(Boolean);
+
+            return {
+              items: sorted,
+              pageInfo: {
+                total: esResult.total,
+                page,
+                perPage,
+                totalPages: Math.ceil(esResult.total / perPage),
+              },
+              facets: esResult.facets,
+            };
+          } catch (err) {
+            console.error("ES search failed, falling back to Prisma:", err);
+            // fall through to Prisma below
+          }
         }
-      })();
 
-      const skip = (page - 1) * perPage;
+        // ── Fallback: Prisma for unfiltered listing ───────────
+        const orderBy = (() => {
+          switch (sortBy) {
+            case "PRICE_ASC":
+              return { basePrice: "asc" as const };
+            case "PRICE_DESC":
+              return { basePrice: "desc" as const };
+            case "BEST_RATED":
+              return { avgRating: "desc" as const };
+            default:
+              return { createdAt: "desc" as const };
+          }
+        })();
 
-      const [items, total] = await Promise.all([
-        prisma.product.findMany({
-          where,
-          orderBy,
-          skip,
-          take: perPage,
-          include: {
-            vendor: true,
-            variants: true,
-            reviews: { take: 0 }, // count only — full reviews on product page
+        const skip = (page - 1) * perPage;
+
+        const [items, total] = await Promise.all([
+          prisma.product.findMany({
+            where: { isActive: true },
+            orderBy,
+            skip,
+            take: perPage,
+            include: { vendor: true, variants: true },
+          }),
+          prisma.product.count({ where: { isActive: true } }),
+        ]);
+
+        const [categories, vendors] = await Promise.all([
+          prisma.product.groupBy({
+            by: ["category"],
+            where: { isActive: true },
+            _count: { category: true },
+          }),
+          prisma.vendor.findMany({
+            where: { status: "APPROVED" },
+            select: {
+              id: true,
+              name: true,
+              _count: { select: { products: true } },
+            },
+          }),
+        ]);
+
+        return {
+          items,
+          pageInfo: {
+            total,
+            page,
+            perPage,
+            totalPages: Math.ceil(total / perPage),
           },
-        }),
-        prisma.product.count({ where }),
-      ]);
-
-      // ── Basic facets from Postgres (ES facets added Day 8) ───
-      const [categories, vendors] = await Promise.all([
-        prisma.product.groupBy({
-          by: ["category"],
-          where: { isActive: true },
-          _count: { category: true },
-        }),
-        prisma.vendor.findMany({
-          where: { status: "APPROVED" },
-          select: {
-            id: true,
-            name: true,
-            _count: { select: { products: true } },
+          facets: {
+            categories: categories.map((c) => ({
+              key: c.category,
+              count: c._count.category,
+            })),
+            vendors: vendors.map((v) => ({
+              key: v.name,
+              count: v._count.products,
+            })),
+            priceRanges: [
+              { from: 0, to: 25, count: 0 },
+              { from: 25, to: 50, count: 0 },
+              { from: 50, to: 100, count: 0 },
+              { from: 100, to: null, count: 0 },
+            ],
+            tags: [],
           },
-        }),
-      ]);
-
-      return {
-        items,
-        pageInfo: {
-          total,
-          page,
-          perPage,
-          totalPages: Math.ceil(total / perPage),
-        },
-        facets: {
-          categories: categories.map((c) => ({
-            key: c.category,
-            count: c._count.category,
-          })),
-          vendors: vendors.map((v) => ({
-            key: v.name,
-            count: v._count.products,
-          })),
-          priceRanges: [
-            { from: 0, to: 25, count: 0 },
-            { from: 25, to: 50, count: 0 },
-            { from: 50, to: 100, count: 0 },
-            { from: 100, to: null, count: 0 },
-          ],
-          tags: [],
-        },
-      };
+        };
+      } catch (err) {
+        console.error("products resolver error:", err);
+        throw err;
+      }
     },
 
-    // ── Single product by slug ────────────────────────────────
     product: async (_: unknown, { slug }: { slug: string }) => {
       return prisma.product.findUnique({
         where: { slug },
@@ -125,7 +164,6 @@ export const productResolvers = {
   },
 
   Mutation: {
-    // ── Create product (vendor only) ──────────────────────────
     createProduct: async (
       _: unknown,
       { input }: { input: any },
@@ -138,11 +176,10 @@ export const productResolvers = {
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/^-|-$/g, "");
 
-      // Ensure slug uniqueness
       const existing = await prisma.product.findUnique({ where: { slug } });
       const finalSlug = existing ? `${slug}-${Date.now()}` : slug;
 
-      return prisma.product.create({
+      const product = await prisma.product.create({
         data: {
           vendorId,
           name: input.name,
@@ -155,9 +192,13 @@ export const productResolvers = {
         },
         include: { vendor: true, variants: true },
       });
+
+      // sync to ES async — don't block response
+      syncProductToES(product.id).catch(console.error);
+
+      return product;
     },
 
-    // ── Update product ────────────────────────────────────────
     updateProduct: async (
       _: unknown,
       { id, input }: { id: string; input: any },
@@ -167,11 +208,10 @@ export const productResolvers = {
 
       const product = await prisma.product.findUnique({ where: { id } });
       if (!product) throw new Error("Product not found");
-      if (product.vendorId !== vendorId && context.role !== "ADMIN") {
+      if (product.vendorId !== vendorId && context.role !== "ADMIN")
         throw new Error("FORBIDDEN");
-      }
 
-      return prisma.product.update({
+      const updated = await prisma.product.update({
         where: { id },
         data: {
           ...(input.name && { name: input.name }),
@@ -186,9 +226,12 @@ export const productResolvers = {
         },
         include: { vendor: true, variants: true },
       });
+
+      syncProductToES(id).catch(console.error);
+
+      return updated;
     },
 
-    // ── Delete product ────────────────────────────────────────
     deleteProduct: async (
       _: unknown,
       { id }: { id: string },
@@ -198,19 +241,15 @@ export const productResolvers = {
 
       const product = await prisma.product.findUnique({ where: { id } });
       if (!product) throw new Error("Product not found");
-      if (product.vendorId !== vendorId && context.role !== "ADMIN") {
+      if (product.vendorId !== vendorId && context.role !== "ADMIN")
         throw new Error("FORBIDDEN");
-      }
 
-      await prisma.product.update({
-        where: { id },
-        data: { isActive: false },
-      });
+      await prisma.product.update({ where: { id }, data: { isActive: false } });
+      syncProductToES(id).catch(console.error);
 
       return true;
     },
 
-    // ── Add variant ───────────────────────────────────────────
     addVariant: async (
       _: unknown,
       { productId, input }: { productId: string; input: any },
@@ -222,11 +261,10 @@ export const productResolvers = {
         where: { id: productId },
       });
       if (!product) throw new Error("Product not found");
-      if (product.vendorId !== vendorId && context.role !== "ADMIN") {
+      if (product.vendorId !== vendorId && context.role !== "ADMIN")
         throw new Error("FORBIDDEN");
-      }
 
-      return prisma.productVariant.create({
+      const variant = await prisma.productVariant.create({
         data: {
           productId,
           sku: input.sku,
@@ -238,9 +276,12 @@ export const productResolvers = {
         },
         include: { product: true },
       });
+
+      syncProductToES(productId).catch(console.error);
+
+      return variant;
     },
 
-    // ── Update inventory ──────────────────────────────────────
     updateInventory: async (
       _: unknown,
       { input }: { input: any },
@@ -268,20 +309,19 @@ export const productResolvers = {
         }),
       ]);
 
+      syncProductToES(variant.productId).catch(console.error);
+
       return updated;
     },
   },
 
-  // ── Field resolvers ───────────────────────────────────────
   Product: {
     vendor: (parent: any) =>
       parent.vendor ??
       prisma.vendor.findUnique({ where: { id: parent.vendorId } }),
-
     variants: (parent: any) =>
       parent.variants ??
       prisma.productVariant.findMany({ where: { productId: parent.id } }),
-
     reviews: (parent: any) =>
       parent.reviews ??
       prisma.review.findMany({
@@ -296,7 +336,6 @@ export const productResolvers = {
     product: (parent: any) =>
       parent.product ??
       prisma.product.findUnique({ where: { id: parent.productId } }),
-
     finalPrice: (parent: any) =>
       Number(parent.priceModifier ?? 0) +
       (parent.product ? Number(parent.product.basePrice) : 0),

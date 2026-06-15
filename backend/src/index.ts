@@ -13,7 +13,8 @@ import { config } from "./config/index.js";
 import { logger } from "./utils/logger.js";
 import { prisma } from "./lib/prisma.js";
 import { connectRedis, redis } from "./lib/redis.js";
-import { pingElasticsearch } from "./lib/elasticsearch.js";
+import { pingElasticsearch, ensureProductIndex } from "./lib/elasticsearch.js";
+import { bulkSyncAllProducts } from "./services/search.js";
 import { resolvers } from "./graphql/resolvers/index.js";
 import { verifyToken, extractToken } from "./middleware/auth.js";
 import type { ApolloContext } from "./graphql/types/index.js";
@@ -27,7 +28,19 @@ const typeDefs = readFileSync(
 
 async function bootstrap() {
   await connectRedis();
-  await pingElasticsearch();
+
+  // ES is non-fatal — app works without it (falls back to Prisma queries)
+  try {
+    await pingElasticsearch();
+    await ensureProductIndex();
+    await bulkSyncAllProducts();
+    logger.info("Elasticsearch ready and products indexed");
+  } catch (err) {
+    logger.warn("Elasticsearch unavailable, running without search index", {
+      message: err instanceof Error ? err.message : String(err),
+    });
+  }
+
   await prisma.$connect();
   logger.info("Database connected");
 
@@ -74,14 +87,12 @@ async function bootstrap() {
     httpServer.listen({ port: config.port }, resolve),
   );
 
-  logger.info(
-    `🚀 CartPlex API ready at http://localhost:${config.port}/graphql`,
-  );
+  logger.info(`🚀 CartPlex API ready at http://localhost:4000/graphql`);
 }
 
 bootstrap().catch((err) => {
   logger.error("Failed to start server", {
-    err: err instanceof Error ? err.message : err,
+    err: err instanceof Error ? err.message : String(err),
   });
   process.exit(1);
 });
