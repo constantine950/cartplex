@@ -1,0 +1,356 @@
+scalar DateTime
+scalar Decimal
+scalar JSON
+
+enum UserRole {
+  BUYER
+  VENDOR
+  ADMIN
+}
+
+enum VendorStatus {
+  PENDING
+  APPROVED
+  SUSPENDED
+}
+
+enum OrderStatus {
+  PENDING_PAYMENT
+  PAID
+  FULFILLING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  REFUNDED
+}
+
+enum CouponType {
+  PERCENTAGE
+  FIXED_AMOUNT
+  FREE_SHIPPING
+  BOGO
+}
+
+enum PayoutStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+enum InventoryReason {
+  SALE
+  RESTOCK
+  ADJUSTMENT
+  RESERVED
+  RELEASED
+}
+
+enum ProductSortBy {
+  RELEVANCE
+  PRICE_ASC
+  PRICE_DESC
+  NEWEST
+  BEST_RATED
+}
+
+type User {
+  id: String
+  email: String
+  name: String
+  role: UserRole
+  vendor: Vendor
+  createdAt: DateTime
+}
+
+type Vendor {
+  id: String
+  name: String
+  slug: String
+  description: String
+  bannerUrl: String
+  logoUrl: String
+  status: VendorStatus
+  stripeOnboardingDone: Boolean
+  products: [Product!]!
+  createdAt: DateTime
+}
+
+type Product {
+  id: String
+  vendor: Vendor
+  name: String
+  slug: String
+  description: String
+  category: String
+  tags: [String!]!
+  basePrice: Decimal
+  images: [String!]!
+  isActive: Boolean
+  avgRating: Decimal
+  variants: [ProductVariant!]!
+  reviews: [Review!]!
+  createdAt: DateTime
+}
+
+type ProductVariant {
+  id: String
+  product: Product
+  sku: String
+  options: JSON
+  priceModifier: Decimal
+  inventoryCount: Int
+  lowStockThreshold: Int
+  backorderEnabled: Boolean
+  finalPrice: Decimal
+}
+
+type CartItem {
+  variantId: String
+  productId: String
+  name: String
+  image: String
+  sku: String
+  options: JSON
+  unitPrice: Decimal
+  quantity: Int
+  lineTotal: Decimal
+}
+
+type Cart {
+  sessionId: String
+  items: [CartItem!]!
+  subtotal: Decimal
+  itemCount: Int
+}
+
+type Order {
+  id: String
+  buyer: User
+  status: OrderStatus
+  subtotal: Decimal
+  discountAmount: Decimal
+  shippingAmount: Decimal
+  taxAmount: Decimal
+  total: Decimal
+  stripePaymentIntentId: String
+  coupon: Coupon
+  items: [OrderItem!]!
+  payouts: [Payout!]!
+  createdAt: DateTime
+  updatedAt: DateTime
+}
+
+type OrderItem {
+  id: String
+  vendor: Vendor
+  variant: ProductVariant
+  quantity: Int
+  unitPrice: Decimal
+  lineTotal: Decimal
+}
+
+type Coupon {
+  id: String
+  code: String
+  type: CouponType
+  value: Decimal
+  minOrderValue: Decimal
+  usageLimit: Int
+  usageCount: Int
+  expiresAt: DateTime
+  isActive: Boolean
+}
+
+type Payout {
+  id: String
+  vendor: Vendor
+  order: Order
+  grossAmount: Decimal
+  platformFee: Decimal
+  netAmount: Decimal
+  stripeTransferId: String
+  status: PayoutStatus
+  createdAt: DateTime
+}
+
+type Review {
+  id: String
+  buyer: User
+  product: Product
+  rating: Int
+  text: String
+  verifiedPurchase: Boolean
+  createdAt: DateTime
+}
+
+type AuthPayload {
+  token: String!
+  user: User!
+}
+
+type PageInfo {
+  total: Int!
+  page: Int!
+  perPage: Int!
+  totalPages: Int!
+}
+
+type ProductsResult {
+  items: [Product!]!
+  pageInfo: PageInfo!
+  facets: Facets
+}
+
+type Facets {
+  categories: [FacetBucket!]!
+  vendors: [FacetBucket!]!
+  priceRanges: [PriceRangeBucket!]!
+  tags: [FacetBucket!]!
+}
+
+type FacetBucket {
+  key: String!
+  count: Int!
+}
+
+type PriceRangeBucket {
+  from: Decimal
+  to: Decimal
+  count: Int!
+}
+
+input RegisterInput {
+  email: String!
+  password: String!
+  name: String!
+}
+
+input LoginInput {
+  email: String!
+  password: String!
+}
+
+input ProductsFilterInput {
+  search: String
+  category: String
+  vendorId: String
+  minPrice: Decimal
+  maxPrice: Decimal
+  inStock: Boolean
+  tags: [String!]
+  sortBy: ProductSortBy
+  page: Int
+  perPage: Int
+}
+
+input CreateProductInput {
+  name: String!
+  description: String
+  category: String!
+  tags: [String!]
+  basePrice: Decimal!
+  images: [String!]
+}
+
+input UpdateProductInput {
+  name: String
+  description: String
+  category: String
+  tags: [String!]
+  basePrice: Decimal
+  images: [String!]
+  isActive: Boolean
+}
+
+input CreateVariantInput {
+  sku: String!
+  options: JSON!
+  priceModifier: Decimal
+  inventoryCount: Int!
+  lowStockThreshold: Int
+  backorderEnabled: Boolean
+}
+
+input AddToCartInput {
+  sessionId: String!
+  variantId: String!
+  quantity: Int!
+}
+
+input UpdateCartItemInput {
+  sessionId: String!
+  variantId: String!
+  quantity: Int!
+}
+
+input CheckoutInput {
+  sessionId: String!
+  shippingAddress: JSON!
+  couponCode: String
+}
+
+input ApplyDiscountInput {
+  sessionId: String!
+  couponCode: String!
+}
+
+input CreateCouponInput {
+  code: String!
+  type: CouponType!
+  value: Decimal!
+  minOrderValue: Decimal
+  appliesToProductIds: [String!]
+  appliesToVendorIds: [String!]
+  usageLimit: Int
+  expiresAt: DateTime
+}
+
+input UpdateInventoryInput {
+  variantId: String!
+  delta: Int!
+  reason: InventoryReason!
+}
+
+input CreateReviewInput {
+  productId: String!
+  rating: Int!
+  text: String
+}
+
+type Query {
+  _health: String
+  me: User
+  products(filter: ProductsFilterInput): ProductsResult!
+  product(slug: String!): Product
+  vendors: [Vendor!]!
+  vendor(slug: String!): Vendor
+  cart(sessionId: String!): Cart!
+  orders: [Order!]!
+  order(id: String!): Order
+  allOrders(status: OrderStatus, page: Int, perPage: Int): [Order!]!
+  allVendors(status: VendorStatus): [Vendor!]!
+  coupon(code: String!): Coupon
+  coupons: [Coupon!]!
+}
+
+type Mutation {
+  register(input: RegisterInput!): AuthPayload!
+  login(input: LoginInput!): AuthPayload!
+  createProduct(input: CreateProductInput!): Product!
+  updateProduct(id: String!, input: UpdateProductInput!): Product!
+  deleteProduct(id: String!): Boolean!
+  addVariant(productId: String!, input: CreateVariantInput!): ProductVariant!
+  updateInventory(input: UpdateInventoryInput!): ProductVariant!
+  addToCart(input: AddToCartInput!): Cart!
+  removeFromCart(sessionId: String!, variantId: String!): Cart!
+  updateCartItem(input: UpdateCartItemInput!): Cart!
+  clearCart(sessionId: String!): Boolean!
+  applyDiscount(input: ApplyDiscountInput!): Cart!
+  checkout(input: CheckoutInput!): Order!
+  updateOrderStatus(orderId: String!, status: OrderStatus!): Order!
+  createReview(input: CreateReviewInput!): Review!
+  approveVendor(vendorId: String!): Vendor!
+  suspendVendor(vendorId: String!): Vendor!
+  createCoupon(input: CreateCouponInput!): Coupon!
+  disableCoupon(id: String!): Coupon!
+}
