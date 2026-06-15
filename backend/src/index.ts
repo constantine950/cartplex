@@ -17,6 +17,7 @@ import { pingElasticsearch, ensureProductIndex } from "./lib/elasticsearch.js";
 import { bulkSyncAllProducts } from "./services/search.js";
 import { resolvers } from "./graphql/resolvers/index.js";
 import { verifyToken, extractToken } from "./middleware/auth.js";
+import { createLoaders } from "./utils/dataloader.js";
 import type { ApolloContext } from "./graphql/types/index.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -29,7 +30,6 @@ const typeDefs = readFileSync(
 async function bootstrap() {
   await connectRedis();
 
-  // ES is non-fatal — app works without it (falls back to Prisma queries)
   try {
     await pingElasticsearch();
     await ensureProductIndex();
@@ -74,6 +74,7 @@ async function bootstrap() {
           role: payload?.role,
           prisma,
           redis,
+          loaders: createLoaders(), // fresh per request
         };
       },
     }),

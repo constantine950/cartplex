@@ -1,5 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
 import type { redis } from "../../lib/redis.js";
+import type { createLoaders } from "../../utils/dataloader.js";
 
 export interface ApolloContext {
   userId?: string;
@@ -7,9 +8,9 @@ export interface ApolloContext {
   role?: "BUYER" | "VENDOR" | "ADMIN";
   prisma: PrismaClient;
   redis: typeof redis;
+  loaders: ReturnType<typeof createLoaders>;
 }
 
-// ── Shared resolver arg types ─────────────────────────────────
 export interface PaginationArgs {
   page?: number;
   perPage?: number;

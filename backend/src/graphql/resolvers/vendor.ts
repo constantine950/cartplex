@@ -8,25 +8,16 @@ export const vendorResolvers = {
     vendors: async () => {
       return prisma.vendor.findMany({
         where: { status: "APPROVED" },
-        include: { products: { where: { isActive: true }, take: 8 } },
       });
     },
 
     vendor: async (_: unknown, { slug }: { slug: string }) => {
-      return prisma.vendor.findUnique({
-        where: { slug },
-        include: {
-          products: { where: { isActive: true }, include: { variants: true } },
-        },
-      });
+      return prisma.vendor.findUnique({ where: { slug } });
     },
 
     me: async (_: unknown, __: unknown, context: ApolloContext) => {
       if (!context.userId) return null;
-      return prisma.user.findUnique({
-        where: { id: context.userId },
-        include: { vendor: true },
-      });
+      return prisma.user.findUnique({ where: { id: context.userId } });
     },
 
     allVendors: async (
@@ -37,7 +28,6 @@ export const vendorResolvers = {
       if (context.role !== "ADMIN") throw new Error("FORBIDDEN");
       return prisma.vendor.findMany({
         where: status ? { status: status as any } : undefined,
-        include: { user: true },
       });
     },
   },
@@ -107,17 +97,14 @@ export const vendorResolvers = {
     },
   },
 
+  // ── Field resolvers using DataLoaders ─────────────────────
   Vendor: {
-    products: (parent: any) =>
-      parent.products ??
-      prisma.product.findMany({
-        where: { vendorId: parent.id, isActive: true },
-        include: { variants: true },
-      }),
+    products: (parent: any, _: any, context: ApolloContext) =>
+      parent.products ?? context.loaders.productsByVendor.load(parent.id),
   },
 
   User: {
-    vendor: (parent: any) =>
+    vendor: (parent: any, _: any, context: ApolloContext) =>
       parent.vendor ??
       prisma.vendor.findUnique({ where: { userId: parent.id } }),
   },

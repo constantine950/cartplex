@@ -1,12 +1,16 @@
 import { prisma } from "../../lib/prisma.js";
 import { requireVendor } from "../../middleware/auth.js";
-import { syncProductToES, bulkSyncAllProducts } from "../../services/search.js";
+import { syncProductToES } from "../../services/search.js";
 import { searchProducts } from "../../lib/elasticsearch.js";
 import type { ApolloContext } from "../types/index.js";
 
 export const productResolvers = {
   Query: {
-    products: async (_: unknown, { filter = {} }: { filter: any }) => {
+    products: async (
+      _: unknown,
+      { filter = {} }: { filter: any },
+      context: ApolloContext,
+    ) => {
       try {
         const {
           search,
@@ -21,7 +25,6 @@ export const productResolvers = {
           perPage = 20,
         } = filter;
 
-        // ── Use Elasticsearch if search or filters present ────
         const useES = !!(
           search ||
           category ||
@@ -68,11 +71,9 @@ export const productResolvers = {
             };
           } catch (err) {
             console.error("ES search failed, falling back to Prisma:", err);
-            // fall through to Prisma below
           }
         }
 
-        // ── Fallback: Prisma for unfiltered listing ───────────
         const orderBy = (() => {
           switch (sortBy) {
             case "PRICE_ASC":
@@ -170,12 +171,10 @@ export const productResolvers = {
       context: ApolloContext,
     ) => {
       const vendorId = requireVendor(context);
-
       const slug = input.name
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/^-|-$/g, "");
-
       const existing = await prisma.product.findUnique({ where: { slug } });
       const finalSlug = existing ? `${slug}-${Date.now()}` : slug;
 
@@ -193,9 +192,7 @@ export const productResolvers = {
         include: { vendor: true, variants: true },
       });
 
-      // sync to ES async — don't block response
       syncProductToES(product.id).catch(console.error);
-
       return product;
     },
 
@@ -205,7 +202,6 @@ export const productResolvers = {
       context: ApolloContext,
     ) => {
       const vendorId = requireVendor(context);
-
       const product = await prisma.product.findUnique({ where: { id } });
       if (!product) throw new Error("Product not found");
       if (product.vendorId !== vendorId && context.role !== "ADMIN")
@@ -228,7 +224,6 @@ export const productResolvers = {
       });
 
       syncProductToES(id).catch(console.error);
-
       return updated;
     },
 
@@ -238,7 +233,6 @@ export const productResolvers = {
       context: ApolloContext,
     ) => {
       const vendorId = requireVendor(context);
-
       const product = await prisma.product.findUnique({ where: { id } });
       if (!product) throw new Error("Product not found");
       if (product.vendorId !== vendorId && context.role !== "ADMIN")
@@ -246,7 +240,6 @@ export const productResolvers = {
 
       await prisma.product.update({ where: { id }, data: { isActive: false } });
       syncProductToES(id).catch(console.error);
-
       return true;
     },
 
@@ -256,7 +249,6 @@ export const productResolvers = {
       context: ApolloContext,
     ) => {
       const vendorId = requireVendor(context);
-
       const product = await prisma.product.findUnique({
         where: { id: productId },
       });
@@ -278,7 +270,6 @@ export const productResolvers = {
       });
 
       syncProductToES(productId).catch(console.error);
-
       return variant;
     },
 
@@ -288,7 +279,6 @@ export const productResolvers = {
       context: ApolloContext,
     ) => {
       requireVendor(context);
-
       const variant = await prisma.productVariant.findUnique({
         where: { id: input.variantId },
       });
@@ -310,32 +300,26 @@ export const productResolvers = {
       ]);
 
       syncProductToES(variant.productId).catch(console.error);
-
       return updated;
     },
   },
 
+  // ── Field resolvers using DataLoaders ─────────────────────
   Product: {
-    vendor: (parent: any) =>
-      parent.vendor ??
-      prisma.vendor.findUnique({ where: { id: parent.vendorId } }),
-    variants: (parent: any) =>
-      parent.variants ??
-      prisma.productVariant.findMany({ where: { productId: parent.id } }),
-    reviews: (parent: any) =>
-      parent.reviews ??
-      prisma.review.findMany({
-        where: { productId: parent.id },
-        include: { buyer: true },
-        orderBy: { createdAt: "desc" },
-        take: 20,
-      }),
+    vendor: (parent: any, _: any, context: ApolloContext) =>
+      parent.vendor ?? context.loaders.vendor.load(parent.vendorId),
+
+    variants: (parent: any, _: any, context: ApolloContext) =>
+      parent.variants ?? context.loaders.variantsByProduct.load(parent.id),
+
+    reviews: (parent: any, _: any, context: ApolloContext) =>
+      parent.reviews ?? context.loaders.reviewsByProduct.load(parent.id),
   },
 
   ProductVariant: {
-    product: (parent: any) =>
-      parent.product ??
-      prisma.product.findUnique({ where: { id: parent.productId } }),
+    product: (parent: any, _: any, context: ApolloContext) =>
+      parent.product ?? context.loaders.product.load(parent.productId),
+
     finalPrice: (parent: any) =>
       Number(parent.priceModifier ?? 0) +
       (parent.product ? Number(parent.product.basePrice) : 0),
