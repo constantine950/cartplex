@@ -68,6 +68,7 @@ export const productResolvers = {
                 totalPages: Math.ceil(esResult.total / perPage),
               },
               facets: esResult.facets,
+              priceStats: esResult.priceStats,
             };
           } catch (err) {
             console.error("ES search failed, falling back to Prisma:", err);

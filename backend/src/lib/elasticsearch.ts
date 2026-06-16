@@ -14,7 +14,6 @@ export async function pingElasticsearch(): Promise<void> {
   logger.info(`Elasticsearch connected — cluster: ${info.cluster_name}`);
 }
 
-// ── Index mapping ─────────────────────────────────────────────
 const INDEX = config.elasticsearch.indices.products;
 
 export async function ensureProductIndex(): Promise<void> {
@@ -137,42 +136,48 @@ export async function searchProducts(params: SearchParams) {
     perPage = 20,
   } = params;
 
-  const must: any[] = [{ term: { isActive: true } }];
-  const filter: any[] = [];
+  // ── Base query — always active products ───────────────────
+  const baseFilter: any[] = [{ term: { isActive: true } }];
 
+  // ── Full-text search ──────────────────────────────────────
+  const must: any[] = [];
   if (search) {
     must.push({
       multi_match: {
         query: search,
         fields: ["name^3", "description", "tags"],
         fuzziness: "AUTO",
+        operator: "or",
       },
     });
   }
 
-  if (category) filter.push({ term: { category } });
-  if (vendorId) filter.push({ term: { vendorId } });
-  if (inStock !== undefined) filter.push({ term: { inStock } });
-  if (tags?.length) filter.push({ terms: { tags } });
+  // ── Narrowing filters (applied to results AND facet counts) ─
+  const activeFilters: any[] = [...baseFilter];
+  if (category) activeFilters.push({ term: { category } });
+  if (vendorId) activeFilters.push({ term: { vendorId } });
+  if (inStock !== undefined) activeFilters.push({ term: { inStock } });
+  if (tags?.length) activeFilters.push({ terms: { tags } });
   if (minPrice !== undefined || maxPrice !== undefined) {
     const range: any = {};
     if (minPrice !== undefined) range.gte = minPrice;
     if (maxPrice !== undefined) range.lte = maxPrice;
-    filter.push({ range: { basePrice: range } });
+    activeFilters.push({ range: { basePrice: range } });
   }
 
+  // ── Sort ──────────────────────────────────────────────────
   const sort: any[] = (() => {
     switch (sortBy) {
       case "PRICE_ASC":
-        return [{ basePrice: "asc" }];
+        return [{ basePrice: { order: "asc" } }];
       case "PRICE_DESC":
-        return [{ basePrice: "desc" }];
+        return [{ basePrice: { order: "desc" } }];
       case "BEST_RATED":
-        return [{ avgRating: "desc" }];
+        return [{ avgRating: { order: "desc" } }];
       case "NEWEST":
-        return [{ createdAt: "desc" }];
+        return [{ createdAt: { order: "desc" } }];
       default:
-        return ["_score"];
+        return [{ _score: { order: "desc" } }];
     }
   })();
 
@@ -182,22 +187,85 @@ export async function searchProducts(params: SearchParams) {
     index: INDEX,
     from,
     size: perPage,
-    query: { bool: { must, filter } },
+    query: {
+      bool: {
+        must: must.length ? must : [{ match_all: {} }],
+        filter: activeFilters,
+      },
+    },
     sort,
+    // ── Aggregations for facets ───────────────────────────
     aggs: {
-      categories: { terms: { field: "category", size: 20 } },
-      vendors: { terms: { field: "vendorName", size: 20 } },
-      tags: { terms: { field: "tags", size: 30 } },
-      price_ranges: {
-        range: {
-          field: "basePrice",
-          ranges: [
-            { from: 0, to: 25 },
-            { from: 25, to: 50 },
-            { from: 50, to: 100 },
-            { from: 100 },
-          ],
+      // Category facet — excludes current category filter so all options show
+      categories: {
+        filter: {
+          bool: {
+            must: must.length ? must : [{ match_all: {} }],
+            filter: activeFilters.filter((f) => !f.term?.category),
+          },
         },
+        aggs: {
+          buckets: { terms: { field: "category", size: 30 } },
+        },
+      },
+
+      // Vendor facet — excludes current vendor filter
+      vendors: {
+        filter: {
+          bool: {
+            must: must.length ? must : [{ match_all: {} }],
+            filter: activeFilters.filter((f) => !f.term?.vendorId),
+          },
+        },
+        aggs: {
+          buckets: { terms: { field: "vendorName", size: 30 } },
+        },
+      },
+
+      // Tags facet — excludes current tag filter
+      tags: {
+        filter: {
+          bool: {
+            must: must.length ? must : [{ match_all: {} }],
+            filter: activeFilters.filter((f) => !f.terms?.tags),
+          },
+        },
+        aggs: {
+          buckets: { terms: { field: "tags", size: 50 } },
+        },
+      },
+
+      // Price ranges — excludes current price filter
+      price_ranges: {
+        filter: {
+          bool: {
+            must: must.length ? must : [{ match_all: {} }],
+            filter: activeFilters.filter((f) => !f.range?.basePrice),
+          },
+        },
+        aggs: {
+          buckets: {
+            range: {
+              field: "basePrice",
+              ranges: [
+                { key: "under-25", from: 0, to: 25 },
+                { key: "25-50", from: 25, to: 50 },
+                { key: "50-100", from: 50, to: 100 },
+                { key: "over-100", from: 100 },
+              ],
+            },
+          },
+        },
+      },
+
+      // In-stock count
+      in_stock_count: {
+        filter: { term: { inStock: true } },
+      },
+
+      // Total price stats for slider bounds
+      price_stats: {
+        stats: { field: "basePrice" },
       },
     },
   });
@@ -211,26 +279,32 @@ export async function searchProducts(params: SearchParams) {
   const aggs = response.aggregations as any;
 
   return {
-    ids: hits.map((h) => h._id),
+    ids: hits.map((h) => h._id as string),
     total,
+    priceStats: {
+      min: aggs?.price_stats?.min ?? 0,
+      max: aggs?.price_stats?.max ?? 1000,
+    },
     facets: {
-      categories: (aggs?.categories?.buckets ?? []).map((b: any) => ({
+      categories: (aggs?.categories?.buckets?.buckets ?? []).map((b: any) => ({
         key: b.key,
         count: b.doc_count,
       })),
-      vendors: (aggs?.vendors?.buckets ?? []).map((b: any) => ({
+      vendors: (aggs?.vendors?.buckets?.buckets ?? []).map((b: any) => ({
         key: b.key,
         count: b.doc_count,
       })),
-      tags: (aggs?.tags?.buckets ?? []).map((b: any) => ({
+      tags: (aggs?.tags?.buckets?.buckets ?? []).map((b: any) => ({
         key: b.key,
         count: b.doc_count,
       })),
-      priceRanges: (aggs?.price_ranges?.buckets ?? []).map((b: any) => ({
-        from: b.from ?? null,
-        to: b.to ?? null,
-        count: b.doc_count,
-      })),
+      priceRanges: (aggs?.price_ranges?.buckets?.buckets ?? []).map(
+        (b: any) => ({
+          from: b.from ?? null,
+          to: b.to ?? null,
+          count: b.doc_count,
+        }),
+      ),
     },
   };
 }

@@ -195,10 +195,16 @@ type PageInfo {
   totalPages: Int!
 }
 
+type PriceStats {
+  min: Decimal!
+  max: Decimal!
+}
+
 type ProductsResult {
   items: [Product!]!
   pageInfo: PageInfo!
   facets: Facets
+  priceStats: PriceStats
 }
 
 type Facets {
