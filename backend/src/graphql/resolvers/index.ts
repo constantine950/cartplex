@@ -1,6 +1,7 @@
 import { DateTimeResolver, JSONResolver } from "graphql-scalars";
 import { productResolvers } from "./product.js";
 import { vendorResolvers } from "./vendor.js";
+import { cartResolvers } from "./cart.js";
 
 const DecimalResolver = {
   serialize: (value: any) => parseFloat(value),
@@ -17,11 +18,13 @@ export const resolvers = {
     _health: () => "CartPlex API is running",
     ...vendorResolvers.Query,
     ...productResolvers.Query,
+    ...cartResolvers.Query,
   },
 
   Mutation: {
     ...vendorResolvers.Mutation,
     ...productResolvers.Mutation,
+    ...cartResolvers.Mutation,
   },
 
   Product: productResolvers.Product,
