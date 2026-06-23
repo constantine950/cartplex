@@ -2,6 +2,7 @@ import { DateTimeResolver, JSONResolver } from "graphql-scalars";
 import { productResolvers } from "./product.js";
 import { vendorResolvers } from "./vendor.js";
 import { cartResolvers } from "./cart.js";
+import { orderResolvers } from "./order.js";
 
 const DecimalResolver = {
   serialize: (value: any) => parseFloat(value),
@@ -19,16 +20,20 @@ export const resolvers = {
     ...vendorResolvers.Query,
     ...productResolvers.Query,
     ...cartResolvers.Query,
+    ...orderResolvers.Query,
   },
 
   Mutation: {
     ...vendorResolvers.Mutation,
     ...productResolvers.Mutation,
     ...cartResolvers.Mutation,
+    ...orderResolvers.Mutation,
   },
 
   Product: productResolvers.Product,
   ProductVariant: productResolvers.ProductVariant,
   Vendor: vendorResolvers.Vendor,
   User: vendorResolvers.User,
+  Order: orderResolvers.Order,
+  OrderItem: orderResolvers.OrderItem,
 };
