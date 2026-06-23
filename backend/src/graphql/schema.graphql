@@ -121,6 +121,9 @@ type Cart {
   items: [CartItem!]!
   subtotal: Decimal
   itemCount: Int
+  discountAmount: Decimal
+  discountDescription: String
+  freeShipping: Boolean
 }
 
 type Order {

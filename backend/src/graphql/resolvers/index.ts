@@ -3,6 +3,7 @@ import { productResolvers } from "./product.js";
 import { vendorResolvers } from "./vendor.js";
 import { cartResolvers } from "./cart.js";
 import { orderResolvers } from "./order.js";
+import { couponResolvers } from "./coupon.js";
 
 const DecimalResolver = {
   serialize: (value: any) => parseFloat(value),
@@ -21,6 +22,7 @@ export const resolvers = {
     ...productResolvers.Query,
     ...cartResolvers.Query,
     ...orderResolvers.Query,
+    ...couponResolvers.Query,
   },
 
   Mutation: {
@@ -28,6 +30,7 @@ export const resolvers = {
     ...productResolvers.Mutation,
     ...cartResolvers.Mutation,
     ...orderResolvers.Mutation,
+    ...couponResolvers.Mutation,
   },
 
   Product: productResolvers.Product,
