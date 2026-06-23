@@ -36,4 +36,5 @@ export const resolvers = {
   User: vendorResolvers.User,
   Order: orderResolvers.Order,
   OrderItem: orderResolvers.OrderItem,
+  Payout: orderResolvers.Payout,
 };

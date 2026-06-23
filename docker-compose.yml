@@ -88,7 +88,7 @@ services:
       REDIS_URL: redis://redis:6379
       ELASTICSEARCH_URL: http://elasticsearch:9200
       JWT_SECRET: ${JWT_SECRET:-dev_jwt_secret_change_in_prod}
-      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-sk_test_placeholder}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-whsec_placeholder}
       PLATFORM_FEE_PERCENT: ${PLATFORM_FEE_PERCENT:-10}
     ports:

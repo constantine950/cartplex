@@ -67,6 +67,15 @@ export const orderResolvers = {
         take: perPage,
       });
     },
+
+    myPayouts: async (_: unknown, __: unknown, context: ApolloContext) => {
+      if (!context.vendorId) throw new Error("FORBIDDEN");
+      return prisma.payout.findMany({
+        where: { vendorId: context.vendorId },
+        include: { order: true },
+        orderBy: { createdAt: "desc" },
+      });
+    },
   },
 
   Mutation: {
@@ -95,9 +104,46 @@ export const orderResolvers = {
       context: ApolloContext,
     ) => {
       if (!context.userId) throw new Error("UNAUTHENTICATED");
-
       const vendorId = context.role === "VENDOR" ? context.vendorId : undefined;
       return updateOrderStatus(orderId, status, vendorId);
+    },
+
+    createStripeAccount: async (
+      _: unknown,
+      __: unknown,
+      context: ApolloContext,
+    ) => {
+      const vendorId = requireVendor(context);
+      const { createStripeConnectAccount } =
+        await import("../../services/payout.js");
+      return createStripeConnectAccount(vendorId);
+    },
+
+    createOnboardingLink: async (
+      _: unknown,
+      __: unknown,
+      context: ApolloContext,
+    ) => {
+      const vendorId = requireVendor(context);
+      const { createOnboardingLink } = await import("../../services/payout.js");
+      return createOnboardingLink(vendorId);
+    },
+
+    processPayouts: async (
+      _: unknown,
+      { orderId }: { orderId: string },
+      context: ApolloContext,
+    ) => {
+      requireAdmin(context);
+      try {
+        const { processOrderPayouts } =
+          await import("../../services/payout.js");
+        await processOrderPayouts(orderId);
+        return true;
+      } catch (err) {
+        console.error("processPayouts error:", err);
+        throw err;
+      }
     },
   },
 
@@ -129,5 +175,14 @@ export const orderResolvers = {
 
     variant: (parent: any, _: any, context: ApolloContext) =>
       parent.variant ?? context.loaders.product.load(parent.variantId),
+  },
+
+  Payout: {
+    vendor: (parent: any, _: any, context: ApolloContext) =>
+      parent.vendor ?? context.loaders.vendor.load(parent.vendorId),
+
+    order: (parent: any) =>
+      parent.order ??
+      prisma.order.findUnique({ where: { id: parent.orderId } }),
   },
 };

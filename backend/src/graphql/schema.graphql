@@ -337,6 +337,7 @@ type Query {
   allVendors(status: VendorStatus): [Vendor!]!
   coupon(code: String!): Coupon
   coupons: [Coupon!]!
+  myPayouts: [Payout!]!
 }
 
 type Mutation {
@@ -359,4 +360,7 @@ type Mutation {
   suspendVendor(vendorId: String!): Vendor!
   createCoupon(input: CreateCouponInput!): Coupon!
   disableCoupon(id: String!): Coupon!
+  createStripeAccount: String!
+  createOnboardingLink: String!
+  processPayouts(orderId: String!): Boolean!
 }
