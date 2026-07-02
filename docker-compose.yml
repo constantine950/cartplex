@@ -98,6 +98,24 @@ services:
       - /app/node_modules
     command: bun --watch src/index.ts
 
+  storefront:
+    build:
+      context: ./storefront
+      dockerfile: Dockerfile
+      target: development
+    container_name: cartplex_storefront
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_GRAPHQL_URL: http://localhost:4000/graphql
+      NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY:-pk_test_placeholder}
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./storefront:/app
+      - /app/node_modules
+      - /app/.next
+    command: bun run dev
+
 volumes:
   postgres_data:
   redis_data:
