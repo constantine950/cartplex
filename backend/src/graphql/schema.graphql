@@ -326,6 +326,14 @@ input CreateReviewInput {
   text: String
 }
 
+type InventoryEvent {
+  id: String!
+  variantId: String!
+  delta: Int!
+  reason: InventoryReason!
+  createdAt: DateTime!
+}
+
 type Query {
   _health: String
   me: User
@@ -341,6 +349,8 @@ type Query {
   coupon(code: String!): Coupon
   coupons: [Coupon!]!
   myPayouts: [Payout!]!
+  inventoryHistory(variantId: String!, limit: Int): [InventoryEvent!]!
+  lowStockVariants: [ProductVariant!]!
 }
 
 type Mutation {
@@ -366,4 +376,8 @@ type Mutation {
   createStripeAccount: String!
   createOnboardingLink: String!
   processPayouts(orderId: String!): Boolean!
+  restockVariant(variantId: String!, quantity: Int!): ProductVariant!
+  toggleBackorder(variantId: String!, enabled: Boolean!): ProductVariant!
+  reserveStock(sessionId: String!, variantId: String!, quantity: Int!): Boolean!
+  releaseStock(sessionId: String!, variantId: String!): Boolean!
 }

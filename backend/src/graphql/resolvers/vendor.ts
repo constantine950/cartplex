@@ -1,5 +1,5 @@
 import { prisma } from "../../lib/prisma.js";
-import { signToken } from "../../middleware/auth.js";
+import { requireVendor, signToken } from "../../middleware/auth.js";
 import bcrypt from "bcryptjs";
 import type { ApolloContext } from "../types/index.js";
 
@@ -28,6 +28,34 @@ export const vendorResolvers = {
       if (context.role !== "ADMIN") throw new Error("FORBIDDEN");
       return prisma.vendor.findMany({
         where: status ? { status: status as any } : undefined,
+      });
+    },
+
+    inventoryHistory: async (
+      _: unknown,
+      { variantId, limit }: { variantId: string; limit?: number },
+      context: ApolloContext,
+    ) => {
+      requireVendor(context);
+      const { getInventoryHistory } =
+        await import("../../services/inventory.js");
+      return getInventoryHistory(variantId, limit);
+    },
+
+    lowStockVariants: async (
+      _: unknown,
+      __: unknown,
+      context: ApolloContext,
+    ) => {
+      const vendorId = requireVendor(context);
+      return prisma.productVariant.findMany({
+        where: {
+          product: { vendorId },
+          inventoryCount: {
+            lte: prisma.productVariant.fields.lowStockThreshold,
+          },
+        },
+        include: { product: true },
       });
     },
   },
@@ -94,6 +122,49 @@ export const vendorResolvers = {
         where: { id: vendorId },
         data: { status: "SUSPENDED" },
       });
+    },
+
+    restockVariant: async (
+      _: unknown,
+      { variantId, quantity }: { variantId: string; quantity: number },
+      context: ApolloContext,
+    ) => {
+      const vendorId = requireVendor(context);
+      const { restockVariant } = await import("../../services/inventory.js");
+      return restockVariant(variantId, quantity, vendorId);
+    },
+
+    toggleBackorder: async (
+      _: unknown,
+      { variantId, enabled }: { variantId: string; enabled: boolean },
+      context: ApolloContext,
+    ) => {
+      const vendorId = requireVendor(context);
+      const { toggleBackorder } = await import("../../services/inventory.js");
+      return toggleBackorder(variantId, enabled, vendorId);
+    },
+
+    reserveStock: async (
+      _: unknown,
+      {
+        sessionId,
+        variantId,
+        quantity,
+      }: { sessionId: string; variantId: string; quantity: number },
+    ) => {
+      const { reserveStock } = await import("../../services/inventory.js");
+      await reserveStock(sessionId, variantId, quantity);
+      return true;
+    },
+
+    releaseStock: async (
+      _: unknown,
+      { sessionId, variantId }: { sessionId: string; variantId: string },
+    ) => {
+      const { releaseReservation } =
+        await import("../../services/inventory.js");
+      await releaseReservation(sessionId, variantId);
+      return true;
     },
   },
 
