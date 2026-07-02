@@ -92,6 +92,20 @@ type Product {
   createdAt: DateTime
 }
 
+type RatingBreakdown {
+  rating: Int!
+  count: Int!
+}
+
+type ReviewsResult {
+  reviews: [Review!]!
+  total: Int!
+  page: Int!
+  perPage: Int!
+  totalPages: Int!
+  ratingBreakdown: [RatingBreakdown!]!
+}
+
 type ProductVariant {
   id: String
   product: Product
@@ -351,6 +365,7 @@ type Query {
   myPayouts: [Payout!]!
   inventoryHistory(variantId: String!, limit: Int): [InventoryEvent!]!
   lowStockVariants: [ProductVariant!]!
+  productReviews(productId: String!, page: Int, perPage: Int): ReviewsResult!
 }
 
 type Mutation {
