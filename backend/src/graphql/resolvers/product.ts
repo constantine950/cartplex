@@ -2,6 +2,7 @@ import { prisma } from "../../lib/prisma.js";
 import { requireVendor } from "../../middleware/auth.js";
 import { syncProductToES } from "../../services/search.js";
 import { searchProducts } from "../../lib/elasticsearch.js";
+import { withCache, invalidateCache, cacheKeys } from "../../services/cache.js";
 import type { ApolloContext } from "../types/index.js";
 
 export const productResolvers = {
@@ -75,93 +76,102 @@ export const productResolvers = {
           }
         }
 
-        const orderBy = (() => {
-          switch (sortBy) {
-            case "PRICE_ASC":
-              return { basePrice: "asc" as const };
-            case "PRICE_DESC":
-              return { basePrice: "desc" as const };
-            case "BEST_RATED":
-              return { avgRating: "desc" as const };
-            default:
-              return { createdAt: "desc" as const };
-          }
-        })();
+        // ── Cached unfiltered listing ─────────────────────────
+        const cacheKey = cacheKeys.products(`${sortBy}:${page}:${perPage}`);
 
-        const skip = (page - 1) * perPage;
+        return withCache(cacheKey, async () => {
+          const orderBy = (() => {
+            switch (sortBy) {
+              case "PRICE_ASC":
+                return { basePrice: "asc" as const };
+              case "PRICE_DESC":
+                return { basePrice: "desc" as const };
+              case "BEST_RATED":
+                return { avgRating: "desc" as const };
+              default:
+                return { createdAt: "desc" as const };
+            }
+          })();
 
-        const [items, total] = await Promise.all([
-          prisma.product.findMany({
-            where: { isActive: true },
-            orderBy,
-            skip,
-            take: perPage,
-            include: { vendor: true, variants: true },
-          }),
-          prisma.product.count({ where: { isActive: true } }),
-        ]);
+          const skip = (page - 1) * perPage;
 
-        const [categories, vendors] = await Promise.all([
-          prisma.product.groupBy({
-            by: ["category"],
-            where: { isActive: true },
-            _count: { category: true },
-          }),
-          prisma.vendor.findMany({
-            where: { status: "APPROVED" },
-            select: {
-              id: true,
-              name: true,
-              _count: { select: { products: true } },
+          const [items, total] = await Promise.all([
+            prisma.product.findMany({
+              where: { isActive: true },
+              orderBy,
+              skip,
+              take: perPage,
+              include: { vendor: true, variants: true },
+            }),
+            prisma.product.count({ where: { isActive: true } }),
+          ]);
+
+          const [categories, vendors] = await Promise.all([
+            prisma.product.groupBy({
+              by: ["category"],
+              where: { isActive: true },
+              _count: { category: true },
+            }),
+            prisma.vendor.findMany({
+              where: { status: "APPROVED" },
+              select: {
+                id: true,
+                name: true,
+                _count: { select: { products: true } },
+              },
+            }),
+          ]);
+
+          return {
+            items,
+            pageInfo: {
+              total,
+              page,
+              perPage,
+              totalPages: Math.ceil(total / perPage),
             },
-          }),
-        ]);
-
-        return {
-          items,
-          pageInfo: {
-            total,
-            page,
-            perPage,
-            totalPages: Math.ceil(total / perPage),
-          },
-          facets: {
-            categories: categories.map((c) => ({
-              key: c.category,
-              count: c._count.category,
-            })),
-            vendors: vendors.map((v) => ({
-              key: v.name,
-              count: v._count.products,
-            })),
-            priceRanges: [
-              { from: 0, to: 25, count: 0 },
-              { from: 25, to: 50, count: 0 },
-              { from: 50, to: 100, count: 0 },
-              { from: 100, to: null, count: 0 },
-            ],
-            tags: [],
-          },
-        };
+            facets: {
+              categories: categories.map((c) => ({
+                key: c.category,
+                count: c._count.category,
+              })),
+              vendors: vendors.map((v) => ({
+                key: v.name,
+                count: v._count.products,
+              })),
+              priceRanges: [
+                { from: 0, to: 25, count: 0 },
+                { from: 25, to: 50, count: 0 },
+                { from: 50, to: 100, count: 0 },
+                { from: 100, to: null, count: 0 },
+              ],
+              tags: [],
+            },
+            priceStats: null,
+          };
+        });
       } catch (err) {
         console.error("products resolver error:", err);
         throw err;
       }
     },
 
+    // ── Cached single product ─────────────────────────────────
     product: async (_: unknown, { slug }: { slug: string }) => {
-      return prisma.product.findUnique({
-        where: { slug },
-        include: {
-          vendor: true,
-          variants: true,
-          reviews: {
-            include: { buyer: true },
-            orderBy: { createdAt: "desc" },
-            take: 20,
+      return withCache(cacheKeys.product(slug), () =>
+        prisma.product.findUnique({
+          where: { slug },
+          include: {
+            vendor: true,
+            variants: true,
+            reviews: {
+              include: { buyer: true },
+              orderBy: { createdAt: "desc" },
+              take: 20,
+            },
           },
-        },
-      });
+        }),
+      );
     },
   },
 
@@ -193,6 +203,8 @@ export const productResolvers = {
         include: { vendor: true, variants: true },
       });
 
+      // Invalidate product list caches
+      await invalidateCache("products:*");
       syncProductToES(product.id).catch(console.error);
       return product;
     },
@@ -224,6 +236,11 @@ export const productResolvers = {
         include: { vendor: true, variants: true },
       });
 
+      // Invalidate specific product cache + list caches
+      await Promise.all([
+        invalidateCache(`product:${updated.slug}`),
+        invalidateCache("products:*"),
+      ]);
       syncProductToES(id).catch(console.error);
       return updated;
     },
@@ -240,6 +257,10 @@ export const productResolvers = {
         throw new Error("FORBIDDEN");
 
       await prisma.product.update({ where: { id }, data: { isActive: false } });
+      await Promise.all([
+        invalidateCache(`product:${product.slug}`),
+        invalidateCache("products:*"),
+      ]);
       syncProductToES(id).catch(console.error);
       return true;
     },
@@ -270,6 +291,7 @@ export const productResolvers = {
         include: { product: true },
       });
 
+      await invalidateCache(`product:${product.slug}`);
       syncProductToES(productId).catch(console.error);
       return variant;
     },
@@ -300,19 +322,20 @@ export const productResolvers = {
         }),
       ]);
 
+      const product = await prisma.product.findUnique({
+        where: { id: variant.productId },
+      });
+      if (product) await invalidateCache(`product:${product.slug}`);
       syncProductToES(variant.productId).catch(console.error);
       return updated;
     },
   },
 
-  // ── Field resolvers using DataLoaders ─────────────────────
   Product: {
     vendor: (parent: any, _: any, context: ApolloContext) =>
       parent.vendor ?? context.loaders.vendor.load(parent.vendorId),
-
     variants: (parent: any, _: any, context: ApolloContext) =>
       parent.variants ?? context.loaders.variantsByProduct.load(parent.id),
-
     reviews: (parent: any, _: any, context: ApolloContext) =>
       parent.reviews ?? context.loaders.reviewsByProduct.load(parent.id),
   },
@@ -320,7 +343,6 @@ export const productResolvers = {
   ProductVariant: {
     product: (parent: any, _: any, context: ApolloContext) =>
       parent.product ?? context.loaders.product.load(parent.productId),
-
     finalPrice: (parent: any) =>
       Number(parent.priceModifier ?? 0) +
       (parent.product ? Number(parent.product.basePrice) : 0),

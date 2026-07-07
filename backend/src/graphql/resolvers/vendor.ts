@@ -2,17 +2,20 @@ import { prisma } from "../../lib/prisma.js";
 import { requireVendor, signToken } from "../../middleware/auth.js";
 import bcrypt from "bcryptjs";
 import type { ApolloContext } from "../types/index.js";
+import { cacheKeys, invalidateCache, withCache } from "../../services/cache.js";
 
 export const vendorResolvers = {
   Query: {
     vendors: async () => {
-      return prisma.vendor.findMany({
-        where: { status: "APPROVED" },
-      });
+      return withCache(cacheKeys.vendors(), () =>
+        prisma.vendor.findMany({ where: { status: "APPROVED" } }),
+      );
     },
 
     vendor: async (_: unknown, { slug }: { slug: string }) => {
-      return prisma.vendor.findUnique({ where: { slug } });
+      return withCache(cacheKeys.vendor(slug), () =>
+        prisma.vendor.findUnique({ where: { slug } }),
+      );
     },
 
     me: async (_: unknown, __: unknown, context: ApolloContext) => {
@@ -106,10 +109,15 @@ export const vendorResolvers = {
       context: ApolloContext,
     ) => {
       if (context.role !== "ADMIN") throw new Error("FORBIDDEN");
-      return prisma.vendor.update({
+      const vendor = await prisma.vendor.update({
         where: { id: vendorId },
         data: { status: "APPROVED" },
       });
+      await Promise.all([
+        invalidateCache(`vendor:${vendor.slug}`),
+        invalidateCache("vendors:all"),
+      ]);
+      return vendor;
     },
 
     suspendVendor: async (
@@ -118,10 +126,15 @@ export const vendorResolvers = {
       context: ApolloContext,
     ) => {
       if (context.role !== "ADMIN") throw new Error("FORBIDDEN");
-      return prisma.vendor.update({
+      const vendor = await prisma.vendor.update({
         where: { id: vendorId },
         data: { status: "SUSPENDED" },
       });
+      await Promise.all([
+        invalidateCache(`vendor:${vendor.slug}`),
+        invalidateCache("vendors:all"),
+      ]);
+      return vendor;
     },
 
     restockVariant: async (
