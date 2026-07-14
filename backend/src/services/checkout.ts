@@ -1,8 +1,8 @@
 import { prisma } from "../lib/prisma.js";
 import { stripe } from "../lib/stripe.js";
 import { getCart, clearCart } from "./cart.js";
+import { logger } from "../utils/logger.js";
 
-// Inline type to avoid Prisma version type issues
 type VariantWithProduct = {
   id: string;
   productId: string;
@@ -28,12 +28,7 @@ type VariantWithProduct = {
     avgRating: any;
     createdAt: Date;
     updatedAt: Date;
-    vendor: {
-      id: string;
-      name: string;
-      slug: string;
-      [key: string]: any;
-    };
+    vendor: { id: string; name: string; slug: string; [key: string]: any };
   };
 };
 
@@ -56,12 +51,12 @@ export async function checkout(
     variants.map((v) => [v.id, v as unknown as VariantWithProduct]),
   );
 
+  // ── Validate stock before creating order ──────────────────
   for (const item of cart.items) {
     const variant = variantMap.get(item.variantId);
     if (!variant) throw new Error(`Variant ${item.variantId} not found`);
-    if (!variant.product.isActive) {
+    if (!variant.product.isActive)
       throw new Error(`${variant.product.name} is no longer available`);
-    }
     if (!variant.backorderEnabled && variant.inventoryCount < item.quantity) {
       throw new Error(
         `Only ${variant.inventoryCount} units of ${variant.product.name} available`,
@@ -69,6 +64,7 @@ export async function checkout(
     }
   }
 
+  // ── Resolve coupon ────────────────────────────────────────
   let coupon = null;
   let discountAmount = 0;
   let freeShipping = false;
@@ -105,18 +101,65 @@ export async function checkout(
   const taxAmount = (subtotal - discountAmount) * 0.08;
   const total = subtotal - discountAmount + shippingAmount + taxAmount;
 
+  // ── Create Stripe PaymentIntent ───────────────────────────
   const paymentIntent = await stripe.paymentIntents.create({
     amount: Math.round(total * 100),
     currency: "usd",
-    metadata: {
-      sessionId,
-      buyerId,
-      couponCode: couponCode ?? "",
-    },
+    metadata: { sessionId, buyerId, couponCode: couponCode ?? "" },
     automatic_payment_methods: { enabled: true },
   });
 
+  // ── Atomic transaction with row-level locks ───────────────
   const order = await prisma.$transaction(async (tx) => {
+    // Lock and decrement inventory atomically — prevents overselling
+    for (const item of cart.items) {
+      const result = await tx.$executeRaw`
+        UPDATE "ProductVariant"
+        SET "inventoryCount" = "inventoryCount" - ${item.quantity}
+        WHERE id = ${item.variantId}
+        AND (
+          "backorderEnabled" = true
+          OR "inventoryCount" >= ${item.quantity}
+        )
+      `;
+
+      // If 0 rows updated, stock ran out between validation and lock
+      if (result === 0) {
+        const variant = variantMap.get(item.variantId);
+        throw new Error(
+          `${variant?.product.name ?? "Item"} just sold out — please update your cart`,
+        );
+      }
+
+      await tx.inventory.create({
+        data: {
+          variantId: item.variantId,
+          delta: -item.quantity,
+          reason: "SALE",
+        },
+      });
+    }
+
+    // ── Atomic coupon usage increment ─────────────────────
+    if (coupon) {
+      const updated = await tx.$executeRaw`
+        UPDATE "Coupon"
+        SET "usageCount" = "usageCount" + 1
+        WHERE id = ${coupon.id}
+        AND (
+          "usageLimit" IS NULL
+          OR "usageCount" < "usageLimit"
+        )
+      `;
+
+      if (updated === 0) {
+        throw new Error(
+          "Coupon usage limit reached — please remove the coupon and try again",
+        );
+      }
+    }
+
+    // ── Create order ──────────────────────────────────────
     const newOrder = await tx.order.create({
       data: {
         buyerId,
@@ -143,46 +186,19 @@ export async function checkout(
       },
       include: {
         items: {
-          include: {
-            variant: { include: { product: true } },
-            vendor: true,
-          },
+          include: { variant: { include: { product: true } }, vendor: true },
         },
         coupon: true,
       },
     });
 
-    for (const item of cart.items) {
-      await tx.productVariant.update({
-        where: { id: item.variantId },
-        data: { inventoryCount: { decrement: item.quantity } },
-      });
-
-      await tx.inventory.create({
-        data: {
-          variantId: item.variantId,
-          delta: -item.quantity,
-          reason: "SALE",
-        },
-      });
-    }
-
-    if (coupon) {
-      await tx.coupon.update({
-        where: { id: coupon.id },
-        data: { usageCount: { increment: 1 } },
-      });
-    }
-
     return newOrder;
   });
 
   await clearCart(sessionId);
+  logger.info("Order created", { orderId: order.id, total, buyerId });
 
-  return {
-    order,
-    clientSecret: paymentIntent.client_secret,
-  };
+  return { order, clientSecret: paymentIntent.client_secret };
 }
 
 export async function updateOrderStatus(

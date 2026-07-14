@@ -31,12 +31,24 @@ export async function validateAndComputeDiscount(
     throw new Error("This coupon has expired");
   }
 
-  // ── Usage limit check (atomic via Redis) ──────────────────
+  // ── Atomic usage check via Redis ──────────────────────────
   if (coupon.usageLimit !== null) {
-    const redisKey = `coupon:usage:${coupon.id}`;
-    const currentUsage = await redis.get(redisKey);
-    const usage = currentUsage ? parseInt(currentUsage) : coupon.usageCount;
-    if (usage >= coupon.usageLimit) {
+    const lockKey = `coupon:lock:${coupon.id}`;
+    const countKey = `coupon:usage:${coupon.id}`;
+
+    // Use Redis INCR for atomic check
+    const currentCount = await redis.incr(countKey);
+
+    // Set expiry on first use (30 days)
+    if (currentCount === 1) {
+      await redis.expire(countKey, 30 * 24 * 60 * 60);
+      // Sync with DB count
+      await redis.set(countKey, coupon.usageCount + 1);
+    }
+
+    if (currentCount > coupon.usageLimit) {
+      // Decrement back since we won't use it
+      await redis.decr(countKey);
       throw new Error("This coupon has reached its usage limit");
     }
   }

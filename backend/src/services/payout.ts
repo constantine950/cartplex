@@ -2,6 +2,7 @@ import { stripe } from "../lib/stripe.js";
 import { prisma } from "../lib/prisma.js";
 import { config } from "../config/index.js";
 import { logger } from "../utils/logger.js";
+import { redis } from "../lib/redis.js";
 
 // ── Onboard vendor to Stripe Connect ─────────────────────────
 export async function createStripeConnectAccount(
@@ -166,6 +167,20 @@ export async function handleStripeWebhook(
     throw new Error(`Webhook signature verification failed: ${err}`);
   }
 
+  // ── Idempotency — deduplicate events via Redis ────────────
+  const idempotencyKey = `webhook:processed:${event.id}`;
+  const alreadyProcessed = await redis.get(idempotencyKey);
+
+  if (alreadyProcessed) {
+    logger.info(`Webhook already processed, skipping: ${event.id}`);
+    return;
+  }
+
+  // Mark as processed immediately (24hr TTL)
+  await redis.setex(idempotencyKey, 24 * 60 * 60, "1");
+
+  logger.info(`Processing webhook: ${event.type} (${event.id})`);
+
   switch (event.type) {
     case "payment_intent.succeeded": {
       const paymentIntent = event.data.object as any;
@@ -180,11 +195,8 @@ export async function handleStripeWebhook(
         break;
       }
 
-      // Idempotency check — skip if already paid
       if (order.status === "PAID") {
-        logger.info("Order already marked as paid, skipping", {
-          orderId: order.id,
-        });
+        logger.info("Order already PAID, skipping", { orderId: order.id });
         break;
       }
 
@@ -194,21 +206,46 @@ export async function handleStripeWebhook(
       });
 
       logger.info("Order marked as PAID", { orderId: order.id });
-
-      // Process vendor payouts
       await processOrderPayouts(order.id);
       break;
     }
 
     case "payment_intent.payment_failed": {
       const paymentIntent = event.data.object as any;
-      await prisma.order.updateMany({
+
+      // Release inventory back to stock on payment failure
+      const order = await prisma.order.findFirst({
         where: { stripePaymentIntentId: paymentIntent.id },
-        data: { status: "CANCELLED" },
+        include: { items: true },
       });
-      logger.info("Order cancelled due to payment failure", {
-        id: paymentIntent.id,
-      });
+
+      if (order && order.status === "PENDING_PAYMENT") {
+        await prisma.$transaction(async (tx) => {
+          // Restore inventory
+          for (const item of order.items) {
+            await tx.productVariant.update({
+              where: { id: item.variantId },
+              data: { inventoryCount: { increment: item.quantity } },
+            });
+            await tx.inventory.create({
+              data: {
+                variantId: item.variantId,
+                delta: item.quantity,
+                reason: "RELEASED",
+              },
+            });
+          }
+
+          await tx.order.update({
+            where: { id: order.id },
+            data: { status: "CANCELLED" },
+          });
+        });
+
+        logger.info("Order cancelled + inventory restored", {
+          orderId: order.id,
+        });
+      }
       break;
     }
 
@@ -225,6 +262,6 @@ export async function handleStripeWebhook(
     }
 
     default:
-      logger.info(`Unhandled webhook event: ${event.type}`);
+      logger.info(`Unhandled webhook: ${event.type}`);
   }
 }
