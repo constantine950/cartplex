@@ -8,7 +8,6 @@ export interface DiscountResult {
   description: string;
 }
 
-// ── Validate and compute discount ─────────────────────────────
 export async function validateAndComputeDiscount(
   couponCode: string,
   cartSubtotal: number,
@@ -19,7 +18,6 @@ export async function validateAndComputeDiscount(
     unitPrice: number;
     lineTotal: number;
   }>,
-  userId?: string,
 ): Promise<DiscountResult> {
   const coupon = await prisma.coupon.findUnique({
     where: { code: couponCode.toUpperCase() },
@@ -31,26 +29,27 @@ export async function validateAndComputeDiscount(
     throw new Error("This coupon has expired");
   }
 
-  // ── Atomic usage check via Redis ──────────────────────────
+  // ── Atomic usage limit check via Redis ────────────────────
   if (coupon.usageLimit !== null) {
-    const lockKey = `coupon:lock:${coupon.id}`;
     const countKey = `coupon:usage:${coupon.id}`;
 
-    // Use Redis INCR for atomic check
-    const currentCount = await redis.incr(countKey);
-
-    // Set expiry on first use (30 days)
-    if (currentCount === 1) {
+    // Sync Redis count with DB on first check
+    const redisCount = await redis.get(countKey);
+    if (!redisCount) {
+      await redis.set(countKey, coupon.usageCount);
       await redis.expire(countKey, 30 * 24 * 60 * 60);
-      // Sync with DB count
-      await redis.set(countKey, coupon.usageCount + 1);
     }
 
-    if (currentCount > coupon.usageLimit) {
-      // Decrement back since we won't use it
+    // Atomic increment then check
+    const newCount = await redis.incr(countKey);
+    if (newCount > coupon.usageLimit) {
+      // Decrement back — we're not using it
       await redis.decr(countKey);
       throw new Error("This coupon has reached its usage limit");
     }
+
+    // Decrement back — actual increment happens at checkout in DB transaction
+    await redis.decr(countKey);
   }
 
   // ── Minimum order value ───────────────────────────────────
@@ -82,7 +81,7 @@ export async function validateAndComputeDiscount(
       include: { product: true },
     });
     const eligibleItems = cartItems.filter((item) => {
-      const variant = variants.find((v) => v.id === item.variantId);
+      const variant = variants.find((v: any) => v.id === item.variantId);
       return (
         variant && coupon.appliesToVendorIds.includes(variant.product.vendorId)
       );
@@ -110,22 +109,18 @@ export async function validateAndComputeDiscount(
       }
       break;
     }
-
     case "FIXED_AMOUNT": {
       discountAmount = Math.min(Number(coupon.value), eligibleSubtotal);
       description = `$${Number(coupon.value).toFixed(2)} off`;
       break;
     }
-
     case "FREE_SHIPPING": {
       freeShipping = true;
       discountAmount = 0;
       description = "Free shipping";
       break;
     }
-
     case "BOGO": {
-      // Buy one get one — discount cheapest eligible item
       const sortedItems = [...cartItems].sort(
         (a, b) => a.unitPrice - b.unitPrice,
       );
@@ -140,24 +135,11 @@ export async function validateAndComputeDiscount(
     }
   }
 
-  // Round to 2 decimal places
   discountAmount = Math.round(discountAmount * 100) / 100;
 
   return { coupon, discountAmount, freeShipping, description };
 }
 
-// ── Stack multiple coupons ────────────────────────────────────
-// Rules: free shipping + percentage can stack, but not two percentages
-export function canStackCoupons(typeA: string, typeB: string): boolean {
-  if (typeA === typeB) return false;
-  const stackable = ["FREE_SHIPPING", "PERCENTAGE", "FIXED_AMOUNT"];
-  const nonStackable = ["BOGO"];
-  if (nonStackable.includes(typeA) || nonStackable.includes(typeB))
-    return false;
-  return stackable.includes(typeA) && stackable.includes(typeB);
-}
-
-// ── Admin: create coupon ──────────────────────────────────────
 export async function createCoupon(input: {
   code: string;
   type: string;
@@ -188,10 +170,17 @@ export async function createCoupon(input: {
   });
 }
 
-// ── Admin: disable coupon ─────────────────────────────────────
 export async function disableCoupon(id: string): Promise<any> {
   return prisma.coupon.update({
     where: { id },
     data: { isActive: false },
   });
+}
+
+export function canStackCoupons(typeA: string, typeB: string): boolean {
+  if (typeA === typeB) return false;
+  const nonStackable = ["BOGO"];
+  if (nonStackable.includes(typeA) || nonStackable.includes(typeB))
+    return false;
+  return true;
 }
