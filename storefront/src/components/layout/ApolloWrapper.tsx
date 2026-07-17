@@ -24,7 +24,27 @@ const httpLink = new HttpLink({
 
 const client = new ApolloClient({
   link: from([errorLink, httpLink]),
-  cache: new InMemoryCache(),
+  cache: new InMemoryCache({
+    typePolicies: {
+      Cart: {
+        // Cart is keyed by sessionId not id
+        keyFields: ["sessionId"],
+      },
+      Query: {
+        fields: {
+          cart: {
+            // Always fetch fresh cart data
+            merge: false,
+          },
+        },
+      },
+    },
+  }),
+  defaultOptions: {
+    watchQuery: {
+      fetchPolicy: "cache-and-network",
+    },
+  },
 });
 
 export function ApolloWrapper({ children }: { children: React.ReactNode }) {

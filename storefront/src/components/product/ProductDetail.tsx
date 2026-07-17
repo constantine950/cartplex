@@ -6,6 +6,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { ReviewSection } from "./ReviewSection";
 import { StockIndicator } from "./StockIndicator";
+import { toast } from "@/components/ui/Toast";
 
 const GET_PRODUCT = gql`
   query GetProduct($slug: String!) {
@@ -67,17 +68,12 @@ function getSessionId(): string {
   return id;
 }
 
-interface ProductDetailProps {
-  slug: string;
-}
-
-export function ProductDetail({ slug }: ProductDetailProps) {
+export function ProductDetail({ slug }: { slug: string }) {
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(
     null,
   );
   const [quantity, setQuantity] = useState(1);
   const [activeImage, setActiveImage] = useState(0);
-  const [addedToCart, setAddedToCart] = useState(false);
 
   const { data, loading, error } = useQuery(GET_PRODUCT, {
     variables: { slug },
@@ -89,9 +85,14 @@ export function ProductDetail({ slug }: ProductDetailProps) {
   });
 
   const [addToCart, { loading: addingToCart }] = useMutation(ADD_TO_CART, {
-    onCompleted: () => {
-      setAddedToCart(true);
-      setTimeout(() => setAddedToCart(false), 2000);
+    onCompleted: (data) => {
+      toast(
+        `Added to cart · ${data.addToCart.itemCount} item${data.addToCart.itemCount !== 1 ? "s" : ""} in cart`,
+        "success",
+      );
+    },
+    onError: (err) => {
+      toast(err.message, "error");
     },
   });
 
@@ -115,10 +116,13 @@ export function ProductDetail({ slug }: ProductDetailProps) {
     ? product.basePrice + (selectedVariant.priceModifier ?? 0)
     : product.basePrice;
 
-  const variantOptions = selectedVariant?.options as Record<
-    string,
-    string
-  > | null;
+  const optionKeys =
+    product.variants.length > 0
+      ? Object.keys(product.variants[0].options ?? {})
+      : [];
+
+  const isOOS =
+    selectedVariant?.inventoryCount === 0 && !selectedVariant?.backorderEnabled;
 
   async function handleAddToCart() {
     if (!selectedVariantId) return;
@@ -133,15 +137,8 @@ export function ProductDetail({ slug }: ProductDetailProps) {
     });
   }
 
-  // Group variants by option key (e.g. size, colour)
-  const optionKeys =
-    product.variants.length > 0
-      ? Object.keys(product.variants[0].options ?? {})
-      : [];
-
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Breadcrumb */}
       <nav className="text-sm text-gray-400 mb-6 flex items-center gap-2">
         <Link href="/" className="hover:text-gray-600">
           Home
@@ -162,7 +159,7 @@ export function ProductDetail({ slug }: ProductDetailProps) {
       </nav>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-        {/* ── Image gallery ─────────────────────────────────── */}
+        {/* Gallery */}
         <div className="space-y-4">
           <div className="relative aspect-square bg-gray-100 rounded-2xl overflow-hidden">
             {product.images[activeImage] ? (
@@ -180,7 +177,6 @@ export function ProductDetail({ slug }: ProductDetailProps) {
               </div>
             )}
           </div>
-
           {product.images.length > 1 && (
             <div className="flex gap-3 overflow-x-auto pb-1">
               {product.images.map((img: string, i: number) => (
@@ -204,33 +200,26 @@ export function ProductDetail({ slug }: ProductDetailProps) {
           )}
         </div>
 
-        {/* ── Product info ───────────────────────────────────── */}
+        {/* Info */}
         <div className="space-y-6">
-          {/* Vendor */}
           <Link
             href={`/vendor/${product.vendor.slug}`}
-            className="text-sm text-gray-400 hover:text-gray-600 transition-colors"
+            className="text-sm text-gray-400 hover:text-gray-600"
           >
             {product.vendor.name}
           </Link>
 
-          {/* Name */}
           <h1 className="text-3xl font-bold text-gray-900 leading-tight">
             {product.name}
           </h1>
 
-          {/* Rating */}
           {product.avgRating > 0 && (
             <div className="flex items-center gap-2">
               <div className="flex">
                 {[1, 2, 3, 4, 5].map((star) => (
                   <span
                     key={star}
-                    className={`text-lg ${
-                      star <= Math.round(product.avgRating)
-                        ? "text-yellow-400"
-                        : "text-gray-200"
-                    }`}
+                    className={`text-lg ${star <= Math.round(product.avgRating) ? "text-yellow-400" : "text-gray-200"}`}
                   >
                     ★
                   </span>
@@ -244,10 +233,8 @@ export function ProductDetail({ slug }: ProductDetailProps) {
             </div>
           )}
 
-          {/* Price */}
           <p className="text-3xl font-bold">${finalPrice.toFixed(2)}</p>
 
-          {/* Description */}
           {product.description && (
             <p className="text-gray-600 leading-relaxed">
               {product.description}
@@ -273,22 +260,21 @@ export function ProductDetail({ slug }: ProductDetailProps) {
                       (v: any) => v.options[key] === val,
                     );
                     const isSelected = selectedVariantId === variant?.id;
-                    const isOOS =
+                    const isVarOOS =
                       variant &&
                       variant.inventoryCount === 0 &&
                       !variant.backorderEnabled;
-
                     return (
                       <button
                         key={val}
                         onClick={() =>
                           variant && setSelectedVariantId(variant.id)
                         }
-                        disabled={isOOS}
+                        disabled={isVarOOS}
                         className={`px-4 py-2 rounded-lg border text-sm font-medium transition-colors ${
                           isSelected
                             ? "border-gray-900 bg-gray-900 text-white"
-                            : isOOS
+                            : isVarOOS
                               ? "border-gray-200 text-gray-300 cursor-not-allowed line-through"
                               : "border-gray-200 text-gray-700 hover:border-gray-400"
                         }`}
@@ -302,7 +288,6 @@ export function ProductDetail({ slug }: ProductDetailProps) {
             );
           })}
 
-          {/* Stock indicator */}
           {selectedVariant && (
             <StockIndicator
               inventoryCount={selectedVariant.inventoryCount}
@@ -333,27 +318,17 @@ export function ProductDetail({ slug }: ProductDetailProps) {
 
             <button
               onClick={handleAddToCart}
-              disabled={
-                addingToCart ||
-                !selectedVariantId ||
-                (selectedVariant?.inventoryCount === 0 &&
-                  !selectedVariant?.backorderEnabled)
-              }
-              className={`flex-1 py-3 px-6 rounded-lg font-semibold text-sm transition-all ${
-                addedToCart
-                  ? "bg-green-600 text-white"
-                  : "bg-gray-900 text-white hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              }`}
+              disabled={addingToCart || !selectedVariantId || isOOS}
+              className="flex-1 py-3 px-6 rounded-lg font-semibold text-sm transition-all bg-gray-900 text-white hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {addedToCart
-                ? "✓ Added to cart"
-                : addingToCart
-                  ? "Adding..."
+              {addingToCart
+                ? "Adding..."
+                : isOOS
+                  ? "Out of stock"
                   : "Add to cart"}
             </button>
           </div>
 
-          {/* Tags */}
           {product.tags?.length > 0 && (
             <div className="flex flex-wrap gap-2 pt-2">
               {product.tags.map((tag: string) => (
@@ -370,7 +345,6 @@ export function ProductDetail({ slug }: ProductDetailProps) {
         </div>
       </div>
 
-      {/* Reviews */}
       <div className="mt-16 border-t border-gray-200 pt-12">
         <ReviewSection
           productId={product.id}

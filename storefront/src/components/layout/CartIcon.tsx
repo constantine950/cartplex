@@ -1,10 +1,41 @@
 "use client";
 
 import Link from "next/link";
-import { useCart } from "@/hooks/useCart";
+import { useQuery, gql } from "@apollo/client";
+import { useEffect, useState } from "react";
+
+const GET_CART_COUNT = gql`
+  query GetCartCount($sessionId: String!) {
+    cart(sessionId: $sessionId) {
+      itemCount
+    }
+  }
+`;
+
+function getSessionId(): string {
+  if (typeof window === "undefined") return "";
+  let id = localStorage.getItem("cartplex_session_id");
+  if (!id) {
+    id = `session_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    localStorage.setItem("cartplex_session_id", id);
+  }
+  return id;
+}
 
 export function CartIcon() {
-  const { itemCount } = useCart();
+  const [sessionId, setSessionId] = useState("");
+
+  useEffect(() => {
+    setSessionId(getSessionId());
+  }, []);
+
+  const { data } = useQuery(GET_CART_COUNT, {
+    variables: { sessionId },
+    skip: !sessionId,
+    pollInterval: 5000, // refresh every 5s
+  });
+
+  const itemCount = data?.cart?.itemCount ?? 0;
 
   return (
     <Link
