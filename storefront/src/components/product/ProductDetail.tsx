@@ -90,6 +90,8 @@ export function ProductDetail({ slug }: { slug: string }) {
         `Added to cart · ${data.addToCart.itemCount} item${data.addToCart.itemCount !== 1 ? "s" : ""} in cart`,
         "success",
       );
+      // Fire event to update cart icon
+      window.dispatchEvent(new Event("cart:updated"));
     },
     onError: (err) => {
       toast(err.message, "error");

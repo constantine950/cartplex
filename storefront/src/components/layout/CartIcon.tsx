@@ -1,16 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useQuery, gql } from "@apollo/client";
 import { useEffect, useState } from "react";
-
-const GET_CART_COUNT = gql`
-  query GetCartCount($sessionId: String!) {
-    cart(sessionId: $sessionId) {
-      itemCount
-    }
-  }
-`;
 
 function getSessionId(): string {
   if (typeof window === "undefined") return "";
@@ -23,19 +14,37 @@ function getSessionId(): string {
 }
 
 export function CartIcon() {
-  const [sessionId, setSessionId] = useState("");
+  const [itemCount, setItemCount] = useState(0);
+
+  async function fetchCartCount() {
+    const sessionId = getSessionId();
+    if (!sessionId) return;
+    try {
+      const res = await fetch("http://localhost:4000/graphql", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          query: `query { cart(sessionId: "${sessionId}") { itemCount } }`,
+        }),
+      });
+      const data = await res.json();
+      setItemCount(data?.data?.cart?.itemCount ?? 0);
+    } catch {}
+  }
 
   useEffect(() => {
-    setSessionId(getSessionId());
+    fetchCartCount();
+
+    // Refresh on custom event fired after addToCart
+    window.addEventListener("cart:updated", fetchCartCount);
+    // Refresh every 10s as fallback
+    const interval = setInterval(fetchCartCount, 10000);
+
+    return () => {
+      window.removeEventListener("cart:updated", fetchCartCount);
+      clearInterval(interval);
+    };
   }, []);
-
-  const { data } = useQuery(GET_CART_COUNT, {
-    variables: { sessionId },
-    skip: !sessionId,
-    pollInterval: 5000, // refresh every 5s
-  });
-
-  const itemCount = data?.cart?.itemCount ?? 0;
 
   return (
     <Link
