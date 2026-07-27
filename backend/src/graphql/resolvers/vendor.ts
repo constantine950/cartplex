@@ -181,7 +181,7 @@ export const vendorResolvers = {
     },
   },
 
-  // ── Field resolvers using DataLoaders ─────────────────────
+  // Field resolvers using DataLoaders
   Vendor: {
     products: (parent: any, _: any, context: ApolloContext) =>
       parent.products ?? context.loaders.productsByVendor.load(parent.id),

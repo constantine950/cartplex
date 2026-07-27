@@ -76,7 +76,7 @@ export const productResolvers = {
           }
         }
 
-        // ── Cached unfiltered listing ─────────────────────────
+        // Cached unfiltered listing
         const cacheKey = cacheKeys.products(`${sortBy}:${page}:${perPage}`);
 
         return withCache(cacheKey, async () => {
@@ -156,7 +156,7 @@ export const productResolvers = {
       }
     },
 
-    // ── Cached single product ─────────────────────────────────
+    // Cached single product
     product: async (_: unknown, { slug }: { slug: string }) => {
       return withCache(cacheKeys.product(slug), () =>
         prisma.product.findUnique({

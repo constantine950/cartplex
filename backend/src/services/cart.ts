@@ -20,14 +20,14 @@ export interface CartData {
   itemCount: number;
 }
 
-// ── Read cart from Redis ──────────────────────────────────────
+//Read cart from Redis
 export async function getCart(sessionId: string): Promise<CartData> {
   const raw = await redis.get(cartKey(sessionId));
   const items: CartLineItem[] = raw ? JSON.parse(raw) : [];
   return buildCartResponse(sessionId, items);
 }
 
-// ── Persist cart to Redis ─────────────────────────────────────
+// Persist cart to Redis
 async function saveCart(
   sessionId: string,
   items: CartLineItem[],
@@ -40,7 +40,7 @@ async function saveCart(
   return buildCartResponse(sessionId, items);
 }
 
-// ── Add item ──────────────────────────────────────────────────
+// Add item
 export async function addToCart(
   sessionId: string,
   variantId: string,
@@ -91,7 +91,7 @@ export async function addToCart(
   return saveCart(sessionId, items);
 }
 
-// ── Remove item ───────────────────────────────────────────────
+// Remove item
 export async function removeFromCart(
   sessionId: string,
   variantId: string,
@@ -102,7 +102,7 @@ export async function removeFromCart(
   return saveCart(sessionId, filtered);
 }
 
-// ── Update quantity ───────────────────────────────────────────
+// Update quantity
 export async function updateCartItem(
   sessionId: string,
   variantId: string,
@@ -130,12 +130,12 @@ export async function updateCartItem(
   return saveCart(sessionId, items);
 }
 
-// ── Clear cart ────────────────────────────────────────────────
+// Clear cart
 export async function clearCart(sessionId: string): Promise<void> {
   await redis.del(cartKey(sessionId));
 }
 
-// ── Apply discount to cart ────────────────────────────────────
+// Apply discount to cart
 export async function applyDiscountToCart(
   sessionId: string,
   couponCode: string,
@@ -187,7 +187,7 @@ export async function applyDiscountToCart(
   };
 }
 
-// ── Merge guest cart on login ─────────────────────────────────
+// Merge guest cart on login
 export async function mergeCarts(
   guestSessionId: string,
   userSessionId: string,
@@ -217,7 +217,7 @@ export async function mergeCarts(
   return saveCart(userSessionId, userItems);
 }
 
-// ── Build response object ─────────────────────────────────────
+// Build response object
 function buildCartResponse(sessionId: string, items: CartLineItem[]): CartData {
   const subtotal = items.reduce((sum, i) => sum + i.lineTotal, 0);
   const itemCount = items.reduce((sum, i) => sum + i.quantity, 0);

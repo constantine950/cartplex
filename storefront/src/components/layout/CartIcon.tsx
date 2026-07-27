@@ -17,8 +17,11 @@ export function CartIcon() {
   const [itemCount, setItemCount] = useState(0);
 
   async function fetchCartCount() {
-    const sessionId = getSessionId();
-    if (!sessionId) return;
+    const sessionId = localStorage.getItem("cartplex_session_id");
+    if (!sessionId) {
+      setItemCount(0);
+      return;
+    }
     try {
       const res = await fetch("http://localhost:4000/graphql", {
         method: "POST",
@@ -29,19 +32,29 @@ export function CartIcon() {
       });
       const data = await res.json();
       setItemCount(data?.data?.cart?.itemCount ?? 0);
-    } catch {}
+    } catch {
+      setItemCount(0);
+    }
   }
 
   useEffect(() => {
+    getSessionId();
     fetchCartCount();
 
-    // Refresh on custom event fired after addToCart
-    window.addEventListener("cart:updated", fetchCartCount);
-    // Refresh every 10s as fallback
+    function handleCartUpdate() {
+      const sessionId = localStorage.getItem("cartplex_session_id");
+      if (!sessionId) {
+        setItemCount(0);
+        return;
+      }
+      fetchCartCount();
+    }
+
+    window.addEventListener("cart:updated", handleCartUpdate);
     const interval = setInterval(fetchCartCount, 10000);
 
     return () => {
-      window.removeEventListener("cart:updated", fetchCartCount);
+      window.removeEventListener("cart:updated", handleCartUpdate);
       clearInterval(interval);
     };
   }, []);

@@ -136,10 +136,10 @@ export async function searchProducts(params: SearchParams) {
     perPage = 20,
   } = params;
 
-  // ── Base query — always active products ───────────────────
+  // Base query — always active products
   const baseFilter: any[] = [{ term: { isActive: true } }];
 
-  // ── Full-text search ──────────────────────────────────────
+  // Full-text search
   const must: any[] = [];
   if (search) {
     must.push({
@@ -152,7 +152,7 @@ export async function searchProducts(params: SearchParams) {
     });
   }
 
-  // ── Narrowing filters (applied to results AND facet counts) ─
+  //Narrowing filters (applied to results AND facet counts)
   const activeFilters: any[] = [...baseFilter];
   if (category) activeFilters.push({ term: { category } });
   if (vendorId) activeFilters.push({ term: { vendorId } });
@@ -165,7 +165,7 @@ export async function searchProducts(params: SearchParams) {
     activeFilters.push({ range: { basePrice: range } });
   }
 
-  // ── Sort ──────────────────────────────────────────────────
+  // Sort
   const sort: any[] = (() => {
     switch (sortBy) {
       case "PRICE_ASC":
@@ -194,7 +194,7 @@ export async function searchProducts(params: SearchParams) {
       },
     },
     sort,
-    // ── Aggregations for facets ───────────────────────────
+    // Aggregations for facets
     aggs: {
       // Category facet — excludes current category filter so all options show
       categories: {

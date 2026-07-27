@@ -35,18 +35,13 @@ export default function LoginPage() {
       localStorage.setItem("cartplex_token", data.login.token);
       localStorage.setItem("cartplex_user", JSON.stringify(data.login.user));
       toast(`Welcome back, ${data.login.user.name}!`, "success");
-
-      if (data.login.user.role === "ADMIN") {
-        router.push("/admin");
-      } else if (data.login.user.role === "VENDOR") {
+      window.dispatchEvent(new Event("auth:updated"));
+      if (data.login.user.role === "ADMIN") router.push("/admin");
+      else if (data.login.user.role === "VENDOR")
         router.push("/vendor-dashboard");
-      } else {
-        router.push("/");
-      }
+      else router.push("/");
     },
-    onError: (err) => {
-      setError(err.message);
-    },
+    onError: (err) => setError(err.message),
   });
 
   async function handleSubmit(e: React.FormEvent) {
@@ -58,12 +53,11 @@ export default function LoginPage() {
   return (
     <div className="min-h-[80vh] flex items-center justify-center px-4">
       <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <Link href="/" className="text-2xl font-bold">
-            Cart<span className="text-gray-400">Plex</span>
-          </Link>
-          <h1 className="text-2xl font-bold mt-6 mb-2">Welcome back</h1>
-          <p className="text-gray-500 text-sm">Sign in to your account</p>
+        <div className="mb-8">
+          <h1 className="text-2xl font-bold mb-1">Welcome back</h1>
+          <p className="text-gray-500 text-sm">
+            Sign in to your CartPlex account
+          </p>
         </div>
 
         <form
@@ -129,12 +123,11 @@ export default function LoginPage() {
           </div>
         </form>
 
-        {/* Demo accounts */}
         <div className="mt-6 bg-gray-50 border border-gray-200 rounded-xl p-4">
           <p className="text-xs font-semibold text-gray-500 uppercase mb-3">
             Demo accounts
           </p>
-          <div className="space-y-2">
+          <div className="space-y-1">
             {[
               {
                 label: "Buyer",

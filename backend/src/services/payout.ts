@@ -4,7 +4,7 @@ import { config } from "../config/index.js";
 import { logger } from "../utils/logger.js";
 import { redis } from "../lib/redis.js";
 
-// ── Onboard vendor to Stripe Connect ─────────────────────────
+// Onboard vendor to Stripe Connect
 export async function createStripeConnectAccount(
   vendorId: string,
 ): Promise<string> {
@@ -31,7 +31,7 @@ export async function createStripeConnectAccount(
   return account.id;
 }
 
-// ── Generate onboarding link ──────────────────────────────────
+// Generate onboarding link
 export async function createOnboardingLink(vendorId: string): Promise<string> {
   const vendor = await prisma.vendor.findUnique({ where: { id: vendorId } });
   if (!vendor) throw new Error("Vendor not found");
@@ -50,7 +50,7 @@ export async function createOnboardingLink(vendorId: string): Promise<string> {
   return link.url;
 }
 
-// ── Split payouts for a paid order ───────────────────────────
+// Split payouts for a paid order
 export async function processOrderPayouts(orderId: string): Promise<void> {
   const order = await prisma.order.findUnique({
     where: { id: orderId },
@@ -150,7 +150,7 @@ export async function processOrderPayouts(orderId: string): Promise<void> {
   }
 }
 
-// ── Handle Stripe webhook ─────────────────────────────────────
+// Handle Stripe webhook
 export async function handleStripeWebhook(
   payload: Buffer,
   signature: string,
@@ -167,7 +167,7 @@ export async function handleStripeWebhook(
     throw new Error(`Webhook signature verification failed: ${err}`);
   }
 
-  // ── Idempotency — deduplicate events via Redis ────────────
+  // Idempotency — deduplicate events via Redis
   const idempotencyKey = `webhook:processed:${event.id}`;
   const alreadyProcessed = await redis.get(idempotencyKey);
 

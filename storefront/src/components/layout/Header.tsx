@@ -22,11 +22,29 @@ export function Header() {
     });
   }, []);
 
-  function handleSignOut() {
+  async function handleSignOut() {
+    const sessionId = localStorage.getItem("cartplex_session_id");
+    if (sessionId) {
+      try {
+        await fetch("http://localhost:4000/graphql", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            query: `mutation { clearCart(sessionId: "${sessionId}") }`,
+          }),
+        });
+      } catch {}
+    }
+
+    // Clear everything BEFORE firing event
     localStorage.removeItem("cartplex_token");
     localStorage.removeItem("cartplex_user");
+    localStorage.removeItem("cartplex_session_id");
     setUser(null);
     setDropdownOpen(false);
+
+    // Now fire — CartIcon will see no session ID and set count to 0
+    window.dispatchEvent(new Event("cart:updated"));
     toast("Signed out successfully", "info");
     router.push("/");
   }

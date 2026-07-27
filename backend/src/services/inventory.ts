@@ -7,7 +7,7 @@ import {
 import { syncProductToES } from "./search.js";
 import { logger } from "../utils/logger.js";
 
-// ── Reserve stock on checkout start ──────────────────────────
+// Reserve stock on checkout start
 export async function reserveStock(
   sessionId: string,
   variantId: string,
@@ -63,7 +63,7 @@ export async function reserveStock(
   syncProductToES(variant.productId).catch(console.error);
 }
 
-// ── Release reservation (abandoned checkout) ──────────────────
+// Release reservation (abandoned checkout)
 export async function releaseReservation(
   sessionId: string,
   variantId: string,
@@ -94,7 +94,7 @@ export async function releaseReservation(
   if (variant) syncProductToES(variant.productId).catch(console.error);
 }
 
-// ── Release all reservations for a session ────────────────────
+// Release all reservations for a session
 export async function releaseAllReservations(
   sessionId: string,
   variantIds: string[],
@@ -104,7 +104,7 @@ export async function releaseAllReservations(
   );
 }
 
-// ── Confirm reservation on payment success ────────────────────
+// Confirm reservation on payment success
 // (converts reservation to actual sale — inventory already decremented)
 export async function confirmReservation(
   sessionId: string,
@@ -115,7 +115,7 @@ export async function confirmReservation(
   logger.info("Reservation confirmed", { variantId, sessionId });
 }
 
-// ── Check low stock and alert ─────────────────────────────────
+// Check low stock and alert
 export async function checkLowStock(variantId: string): Promise<void> {
   const variant = await prisma.productVariant.findUnique({
     where: { id: variantId },
@@ -138,7 +138,7 @@ export async function checkLowStock(variantId: string): Promise<void> {
     });
 
     // In production: send email/webhook to vendor here
-    // For now we log — Day 24 adds real-time WebSocket alerts
+    // For now we log —  adds real-time WebSocket alerts
   }
 
   if (variant.inventoryCount === 0 && !variant.backorderEnabled) {
@@ -150,7 +150,7 @@ export async function checkLowStock(variantId: string): Promise<void> {
   }
 }
 
-// ── Restock variant ───────────────────────────────────────────
+// Restock variant
 export async function restockVariant(
   variantId: string,
   quantity: number,
@@ -186,7 +186,7 @@ export async function restockVariant(
   return updated;
 }
 
-// ── Toggle backorder ──────────────────────────────────────────
+// Toggle backorder
 export async function toggleBackorder(
   variantId: string,
   enabled: boolean,
@@ -211,7 +211,7 @@ export async function toggleBackorder(
   return updated;
 }
 
-// ── Get inventory history for a variant ──────────────────────
+// Get inventory history for a variant
 export async function getInventoryHistory(variantId: string, limit = 20) {
   return prisma.inventory.findMany({
     where: { variantId },
@@ -220,7 +220,7 @@ export async function getInventoryHistory(variantId: string, limit = 20) {
   });
 }
 
-// ── Atomic decrement with row-level lock ──────────────────────
+// Atomic decrement with row-level lock
 // Used at checkout to prevent race conditions
 export async function atomicDecrementStock(
   variantId: string,

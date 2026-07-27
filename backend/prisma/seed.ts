@@ -6,7 +6,7 @@ const prisma = new PrismaClient();
 async function main() {
   console.log("🌱 Seeding database...");
 
-  // ── Admin user ──────────────────────────────────────────────
+  // Admin user
   const adminPassword = await bcrypt.hash("admin123", 10);
   await prisma.user.upsert({
     where: { email: "admin@cartplex.dev" },
@@ -19,7 +19,7 @@ async function main() {
     },
   });
 
-  // ── Vendor 1 — TechGear ─────────────────────────────────────
+  // Vendor 1 — TechGear
   const vendor1Password = await bcrypt.hash("vendor123", 10);
   const vendor1User = await prisma.user.upsert({
     where: { email: "techgear@cartplex.dev" },
@@ -44,7 +44,7 @@ async function main() {
     },
   });
 
-  // ── Vendor 2 — StyleHouse ───────────────────────────────────
+  // Vendor 2 — StyleHouse
   const vendor2Password = await bcrypt.hash("vendor123", 10);
   const vendor2User = await prisma.user.upsert({
     where: { email: "stylehouse@cartplex.dev" },
@@ -69,7 +69,7 @@ async function main() {
     },
   });
 
-  // ── Vendor 3 — HomeNest ─────────────────────────────────────
+  // Vendor 3 — HomeNest
   const vendor3Password = await bcrypt.hash("vendor123", 10);
   const vendor3User = await prisma.user.upsert({
     where: { email: "homenest@cartplex.dev" },
@@ -94,7 +94,7 @@ async function main() {
     },
   });
 
-  // ── Buyer ────────────────────────────────────────────────────
+  // Buyer
   const buyerPassword = await bcrypt.hash("buyer123", 10);
   await prisma.user.upsert({
     where: { email: "buyer@cartplex.dev" },
@@ -107,7 +107,7 @@ async function main() {
     },
   });
 
-  // ── TechGear Products (8) ────────────────────────────────────
+  // TechGear Products (8)
   const techProducts = [
     {
       name: "Wireless Noise-Cancelling Headphones",
@@ -189,7 +189,7 @@ async function main() {
     });
   }
 
-  // ── StyleHouse Products (6) ──────────────────────────────────
+  // StyleHouse Products (6)
   const styleProducts = [
     {
       name: "Classic Denim Jacket",
@@ -262,7 +262,7 @@ async function main() {
     }
   }
 
-  // ── HomeNest Products (6) ────────────────────────────────────
+  // HomeNest Products (6)
   const homeProducts = [
     {
       name: "Scented Soy Candle Set",
@@ -332,7 +332,7 @@ async function main() {
     });
   }
 
-  // ── Coupons ──────────────────────────────────────────────────
+  //  Coupons
   await prisma.coupon.upsert({
     where: { code: "WELCOME10" },
     update: {},

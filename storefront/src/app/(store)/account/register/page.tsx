@@ -35,11 +35,10 @@ export default function RegisterPage() {
       localStorage.setItem("cartplex_token", data.register.token);
       localStorage.setItem("cartplex_user", JSON.stringify(data.register.user));
       toast(`Welcome to CartPlex, ${data.register.user.name}!`, "success");
+      window.dispatchEvent(new Event("auth:updated"));
       router.push("/");
     },
-    onError: (err) => {
-      setError(err.message);
-    },
+    onError: (err) => setError(err.message),
   });
 
   async function handleSubmit(e: React.FormEvent) {
@@ -63,11 +62,8 @@ export default function RegisterPage() {
   return (
     <div className="min-h-[80vh] flex items-center justify-center px-4">
       <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <Link href="/" className="text-2xl font-bold">
-            Cart<span className="text-gray-400">Plex</span>
-          </Link>
-          <h1 className="text-2xl font-bold mt-6 mb-2">Create your account</h1>
+        <div className="mb-8">
+          <h1 className="text-2xl font-bold mb-1">Create your account</h1>
           <p className="text-gray-500 text-sm">
             Start shopping from independent vendors
           </p>
@@ -90,7 +86,6 @@ export default function RegisterPage() {
               className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 transition-all"
             />
           </div>
-
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Email
@@ -106,7 +101,6 @@ export default function RegisterPage() {
               className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 transition-all"
             />
           </div>
-
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Password
@@ -122,7 +116,6 @@ export default function RegisterPage() {
               className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 transition-all"
             />
           </div>
-
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Confirm password

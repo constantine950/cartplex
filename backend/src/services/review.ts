@@ -7,11 +7,11 @@ export async function createReview(
   rating: number,
   text?: string,
 ): Promise<any> {
-  // ── Validate rating ───────────────────────────────────────
+  // Validate rating
   if (rating < 1 || rating > 5)
     throw new Error("Rating must be between 1 and 5");
 
-  // ── Check for verified purchase ───────────────────────────
+  // Check for verified purchase
   const purchase = await prisma.orderItem.findFirst({
     where: {
       order: {
@@ -24,7 +24,7 @@ export async function createReview(
 
   const verifiedPurchase = !!purchase;
 
-  // ── Upsert review (one per buyer per product) ─────────────
+  // Upsert review (one per buyer per product)
   const review = await prisma.review.upsert({
     where: { buyerId_productId: { buyerId, productId } },
     update: { rating, text, verifiedPurchase },
@@ -32,7 +32,7 @@ export async function createReview(
     include: { buyer: true, product: true },
   });
 
-  // ── Update product avg rating ─────────────────────────────
+  // Update product avg rating
   await updateProductRating(productId);
 
   return review;

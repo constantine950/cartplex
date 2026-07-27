@@ -29,7 +29,7 @@ export async function validateAndComputeDiscount(
     throw new Error("This coupon has expired");
   }
 
-  // ── Atomic usage limit check via Redis ────────────────────
+  // Atomic usage limit check via Redis
   if (coupon.usageLimit !== null) {
     const countKey = `coupon:usage:${coupon.id}`;
 
@@ -52,7 +52,7 @@ export async function validateAndComputeDiscount(
     await redis.decr(countKey);
   }
 
-  // ── Minimum order value ───────────────────────────────────
+  // Minimum order value
   if (
     coupon.minOrderValue !== null &&
     cartSubtotal < Number(coupon.minOrderValue)
@@ -62,7 +62,7 @@ export async function validateAndComputeDiscount(
     );
   }
 
-  // ── Product/vendor restrictions ───────────────────────────
+  // Product/vendor restrictions
   let eligibleSubtotal = cartSubtotal;
 
   if (coupon.appliesToProductIds.length > 0) {
@@ -92,7 +92,7 @@ export async function validateAndComputeDiscount(
     eligibleSubtotal = eligibleItems.reduce((sum, i) => sum + i.lineTotal, 0);
   }
 
-  // ── Compute discount by type ──────────────────────────────
+  // Compute discount by type
   let discountAmount = 0;
   let freeShipping = false;
   let description = "";

@@ -51,7 +51,7 @@ export async function checkout(
     variants.map((v) => [v.id, v as unknown as VariantWithProduct]),
   );
 
-  // ── Validate stock before creating order ──────────────────
+  // Validate stock before creating order
   for (const item of cart.items) {
     const variant = variantMap.get(item.variantId);
     if (!variant) throw new Error(`Variant ${item.variantId} not found`);
@@ -64,7 +64,7 @@ export async function checkout(
     }
   }
 
-  // ── Resolve coupon ────────────────────────────────────────
+  // Resolve coupon
   let coupon = null;
   let discountAmount = 0;
   let freeShipping = false;
@@ -101,7 +101,7 @@ export async function checkout(
   const taxAmount = (subtotal - discountAmount) * 0.08;
   const total = subtotal - discountAmount + shippingAmount + taxAmount;
 
-  // ── Create Stripe PaymentIntent ───────────────────────────
+  // Create Stripe PaymentIntent
   const paymentIntent = await stripe.paymentIntents.create({
     amount: Math.round(total * 100),
     currency: "usd",
@@ -109,7 +109,7 @@ export async function checkout(
     automatic_payment_methods: { enabled: true },
   });
 
-  // ── Atomic transaction with row-level locks ───────────────
+  // Atomic transaction with row-level locks
   const order = await prisma.$transaction(async (tx) => {
     // Lock and decrement inventory atomically — prevents overselling
     for (const item of cart.items) {
@@ -140,7 +140,7 @@ export async function checkout(
       });
     }
 
-    // ── Atomic coupon usage increment ─────────────────────
+    //Atomic coupon usage increment
     if (coupon) {
       const updated = await tx.$executeRaw`
         UPDATE "Coupon"
@@ -159,7 +159,7 @@ export async function checkout(
       }
     }
 
-    // ── Create order ──────────────────────────────────────
+    // Create order
     const newOrder = await tx.order.create({
       data: {
         buyerId,

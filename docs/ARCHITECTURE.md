@@ -115,33 +115,3 @@ Multi-vendor payouts require splitting a single buyer payment across multiple ve
 ## DataLoader Pattern
 
 Each GraphQL request gets a fresh set of DataLoader instances. When a list of products is returned, each product's `vendor` field resolver calls `loaders.vendor.load(vendorId)`. DataLoader batches all vendor IDs collected during the tick into a single `WHERE id IN (...)` query, eliminating N+1.
-
-## Directory Structure
-
-backend/
-
-├── prisma/
-
-│ ├── schema.prisma # Single source of truth for DB schema
-
-│ └── seed.ts # Dev seed: 3 vendors, 20 products
-
-├── src/
-
-│ ├── config/ # Typed env config
-
-│ ├── graphql/
-
-│ │ ├── schema.graphql # All types, queries, mutations
-
-│ │ ├── resolvers/ # One file per domain
-
-│ │ └── types/ # ApolloContext type
-
-│ ├── lib/ # Singleton clients (Prisma, ES, Redis, Stripe)
-
-│ ├── middleware/ # JWT auth helpers
-
-│ ├── services/ # Business logic (search sync, cart, checkout)
-
-│ └── utils/ # DataLoader factory, logger
