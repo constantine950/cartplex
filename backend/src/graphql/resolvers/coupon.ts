@@ -29,7 +29,6 @@ export const couponResolvers = {
     applyDiscount: async (
       _: unknown,
       { input }: { input: { sessionId: string; couponCode: string } },
-      context: ApolloContext,
     ) => {
       const cart = await getCart(input.sessionId);
       if (!cart.items.length) throw new Error("Cart is empty");
@@ -38,7 +37,6 @@ export const couponResolvers = {
         input.couponCode,
         cart.subtotal,
         cart.items,
-        context.userId,
       );
 
       // Return cart with discount info attached

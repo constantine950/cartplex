@@ -1,7 +1,7 @@
 import DataLoader from "dataloader";
 import { prisma } from "../lib/prisma.js";
 
-// ── Vendor loader ─────────────────────────────────────────────
+// Vendor loader
 export function createVendorLoader() {
   return new DataLoader(async (ids: readonly string[]) => {
     const vendors = await prisma.vendor.findMany({
@@ -12,7 +12,7 @@ export function createVendorLoader() {
   });
 }
 
-// ── Product loader ────────────────────────────────────────────
+// Product loader
 export function createProductLoader() {
   return new DataLoader(async (ids: readonly string[]) => {
     const products = await prisma.product.findMany({
@@ -23,7 +23,7 @@ export function createProductLoader() {
   });
 }
 
-// ── Variants by product loader ────────────────────────────────
+// Variants by product loader
 export function createVariantsByProductLoader() {
   return new DataLoader(async (productIds: readonly string[]) => {
     const variants = await prisma.productVariant.findMany({
@@ -33,7 +33,7 @@ export function createVariantsByProductLoader() {
   });
 }
 
-// ── Reviews by product loader ─────────────────────────────────
+// Reviews by product loader
 export function createReviewsByProductLoader() {
   return new DataLoader(async (productIds: readonly string[]) => {
     const reviews = await prisma.review.findMany({
@@ -45,7 +45,7 @@ export function createReviewsByProductLoader() {
   });
 }
 
-// ── Products by vendor loader ─────────────────────────────────
+// Products by vendor loader
 export function createProductsByVendorLoader() {
   return new DataLoader(async (vendorIds: readonly string[]) => {
     const products = await prisma.product.findMany({
@@ -56,7 +56,7 @@ export function createProductsByVendorLoader() {
   });
 }
 
-// ── User loader ───────────────────────────────────────────────
+// User loader
 export function createUserLoader() {
   return new DataLoader(async (ids: readonly string[]) => {
     const users = await prisma.user.findMany({
@@ -67,7 +67,7 @@ export function createUserLoader() {
   });
 }
 
-// ── Factory — one set of loaders per request ──────────────────
+//Factory — one set of loaders per request
 export function createLoaders() {
   return {
     vendor: createVendorLoader(),

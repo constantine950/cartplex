@@ -1,4 +1,4 @@
-import { PrismaClient, UserRole, VendorStatus } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
@@ -40,7 +40,7 @@ async function main() {
       name: "TechGear",
       slug: "techgear",
       description: "Premium tech accessories and gadgets.",
-      status: VendorStatus.APPROVED,
+      status: "APPROVED",
     },
   });
 
@@ -65,7 +65,7 @@ async function main() {
       name: "StyleHouse",
       slug: "stylehouse",
       description: "Trendy fashion for every occasion.",
-      status: VendorStatus.APPROVED,
+      status: "APPROVED",
     },
   });
 
@@ -90,7 +90,7 @@ async function main() {
       name: "HomeNest",
       slug: "homenest",
       description: "Beautiful homewares and decor.",
-      status: VendorStatus.APPROVED,
+      status: "APPROVED",
     },
   });
 
