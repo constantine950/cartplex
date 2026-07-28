@@ -220,7 +220,7 @@ export async function handleStripeWebhook(
       });
 
       if (order && order.status === "PENDING_PAYMENT") {
-        await prisma.$transaction(async (tx) => {
+        await prisma.$transaction(async (tx: any) => {
           // Restore inventory
           for (const item of order.items) {
             await tx.productVariant.update({

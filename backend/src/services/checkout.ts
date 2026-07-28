@@ -48,7 +48,7 @@ export async function checkout(
   });
 
   const variantMap = new Map<string, VariantWithProduct>(
-    variants.map((v) => [v.id, v as unknown as VariantWithProduct]),
+    variants.map((v: any) => [v.id, v as unknown as VariantWithProduct]),
   );
 
   // Validate stock before creating order
@@ -110,7 +110,7 @@ export async function checkout(
   });
 
   // Atomic transaction with row-level locks
-  const order = await prisma.$transaction(async (tx) => {
+  const order = await prisma.$transaction(async (tx: any) => {
     // Lock and decrement inventory atomically — prevents overselling
     for (const item of cart.items) {
       const result = await tx.$executeRaw`
@@ -214,7 +214,7 @@ export async function updateOrderStatus(
   if (!order) throw new Error("Order not found");
 
   if (vendorId) {
-    const hasItem = order.items.some((i) => i.vendorId === vendorId);
+    const hasItem = order.items.some((i: any) => i.vendorId === vendorId);
     if (!hasItem) throw new Error("FORBIDDEN");
   }
 

@@ -57,7 +57,7 @@ export const productResolvers = {
             });
 
             const sorted = esResult.ids
-              .map((id) => products.find((p) => p.id === id))
+              .map((id) => products.find((p: any) => p.id === id))
               .filter(Boolean);
 
             return {
@@ -131,11 +131,11 @@ export const productResolvers = {
               totalPages: Math.ceil(total / perPage),
             },
             facets: {
-              categories: categories.map((c) => ({
+              categories: categories.map((c: any) => ({
                 key: c.category,
                 count: c._count.category,
               })),
-              vendors: vendors.map((v) => ({
+              vendors: vendors.map((v: any) => ({
                 key: v.name,
                 count: v._count.products,
               })),

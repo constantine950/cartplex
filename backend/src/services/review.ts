@@ -80,7 +80,7 @@ export async function getProductReviews(
 
   const ratingBreakdown = [1, 2, 3, 4, 5].map((r) => ({
     rating: r,
-    count: stats.find((s) => s.rating === r)?._count.rating ?? 0,
+    count: stats.find((s: any) => s.rating === r)?._count.rating ?? 0,
   }));
 
   return {

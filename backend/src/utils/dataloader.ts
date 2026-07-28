@@ -7,7 +7,7 @@ export function createVendorLoader() {
     const vendors = await prisma.vendor.findMany({
       where: { id: { in: [...ids] } },
     });
-    const map = new Map(vendors.map((v) => [v.id, v]));
+    const map = new Map(vendors.map((v: any) => [v.id, v]));
     return ids.map((id) => map.get(id) ?? null);
   });
 }
@@ -18,7 +18,7 @@ export function createProductLoader() {
     const products = await prisma.product.findMany({
       where: { id: { in: [...ids] } },
     });
-    const map = new Map(products.map((p) => [p.id, p]));
+    const map = new Map(products.map((p: any) => [p.id, p]));
     return ids.map((id) => map.get(id) ?? null);
   });
 }
@@ -29,7 +29,9 @@ export function createVariantsByProductLoader() {
     const variants = await prisma.productVariant.findMany({
       where: { productId: { in: [...productIds] } },
     });
-    return productIds.map((id) => variants.filter((v) => v.productId === id));
+    return productIds.map((id) =>
+      variants.filter((v: any) => v.productId === id),
+    );
   });
 }
 
@@ -41,7 +43,9 @@ export function createReviewsByProductLoader() {
       include: { buyer: true },
       orderBy: { createdAt: "desc" },
     });
-    return productIds.map((id) => reviews.filter((r) => r.productId === id));
+    return productIds.map((id) =>
+      reviews.filter((r: any) => r.productId === id),
+    );
   });
 }
 
@@ -52,7 +56,9 @@ export function createProductsByVendorLoader() {
       where: { vendorId: { in: [...vendorIds] }, isActive: true },
       include: { variants: true },
     });
-    return vendorIds.map((id) => products.filter((p) => p.vendorId === id));
+    return vendorIds.map((id) =>
+      products.filter((p: any) => p.vendorId === id),
+    );
   });
 }
 
@@ -62,7 +68,7 @@ export function createUserLoader() {
     const users = await prisma.user.findMany({
       where: { id: { in: [...ids] } },
     });
-    const map = new Map(users.map((u) => [u.id, u]));
+    const map = new Map(users.map((u: any) => [u.id, u]));
     return ids.map((id) => map.get(id) ?? null);
   });
 }

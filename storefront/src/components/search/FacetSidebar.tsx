@@ -190,7 +190,7 @@ export function FacetSidebar({
                   key={tag.key}
                   onClick={() => {
                     const next = isActive
-                      ? activeTags.filter((t) => t !== tag.key)
+                      ? activeTags.filter((t: any) => t !== tag.key)
                       : [...activeTags, tag.key];
                     onUpdate({
                       tags: next.length ? next.join(",") : undefined,
