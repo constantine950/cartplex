@@ -1,3 +1,5 @@
+/// <reference types="node" />
+
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
@@ -15,7 +17,7 @@ async function main() {
       email: "admin@cartplex.dev",
       passwordHash: adminPassword,
       name: "CartPlex Admin",
-      role: UserRole.ADMIN,
+      role: "ADMIN",
     },
   });
 
@@ -28,7 +30,7 @@ async function main() {
       email: "techgear@cartplex.dev",
       passwordHash: vendor1Password,
       name: "TechGear Store",
-      role: UserRole.VENDOR,
+      role: "VENDOR",
     },
   });
 
@@ -53,7 +55,7 @@ async function main() {
       email: "stylehouse@cartplex.dev",
       passwordHash: vendor2Password,
       name: "StyleHouse",
-      role: UserRole.VENDOR,
+      role: "VENDOR",
     },
   });
 
@@ -78,7 +80,7 @@ async function main() {
       email: "homenest@cartplex.dev",
       passwordHash: vendor3Password,
       name: "HomeNest",
-      role: UserRole.VENDOR,
+      role: "VENDOR",
     },
   });
 
@@ -103,7 +105,7 @@ async function main() {
       email: "buyer@cartplex.dev",
       passwordHash: buyerPassword,
       name: "Test Buyer",
-      role: UserRole.BUYER,
+      role: "BUYER",
     },
   });
 
