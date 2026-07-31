@@ -53,12 +53,15 @@ export function Footer() {
             <p className="font-medium text-sm mb-3">Sell</p>
             <ul className="space-y-2 text-sm text-gray-500">
               <li>
-                <Link href="/vendor/register" className="hover:text-gray-900">
+                <Link
+                  href="/account/vendor-register"
+                  className="hover:text-gray-900"
+                >
                   Become a Vendor
                 </Link>
               </li>
               <li>
-                <Link href="/vendor/dashboard" className="hover:text-gray-900">
+                <Link href="/vendor-dashboard" className="hover:text-gray-900">
                   Vendor Dashboard
                 </Link>
               </li>
@@ -74,12 +77,12 @@ export function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="/returns" className="hover:text-gray-900">
+                <Link href="/help#returns" className="hover:text-gray-900">
                   Returns
                 </Link>
               </li>
               <li>
-                <Link href="/contact" className="hover:text-gray-900">
+                <Link href="/help#contact" className="hover:text-gray-900">
                   Contact
                 </Link>
               </li>
@@ -88,7 +91,8 @@ export function Footer() {
         </div>
 
         <div className="border-t border-gray-200 mt-8 pt-8 text-sm text-gray-400 text-center">
-          © {new Date().getFullYear()} CartPlex
+          © {new Date().getFullYear()} CartPlex. Built with Next.js, GraphQL &
+          Stripe.
         </div>
       </div>
     </footer>
