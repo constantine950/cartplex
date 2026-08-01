@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useState } from "react";
 
 const CATEGORIES = [
   { name: "Audio", emoji: "🎧", slug: "Audio" },
@@ -12,6 +15,18 @@ const CATEGORIES = [
 ];
 
 export default function HomePage() {
+  const [sellHref, setSellHref] = useState("/account/vendor-register");
+
+  useEffect(() => {
+    const stored = localStorage.getItem("cartplex_user");
+    if (stored) {
+      const user = JSON.parse(stored);
+      if (user.role === "VENDOR") setSellHref("/vendor-dashboard");
+      else if (user.role === "ADMIN") setSellHref("/admin");
+      else setSellHref("/account/vendor-register");
+    }
+  }, []);
+
   return (
     <div>
       {/* Hero */}
@@ -34,10 +49,12 @@ export default function HomePage() {
               Browse all products
             </Link>
             <Link
-              href="/vendor/register"
+              href={sellHref}
               className="border border-gray-600 text-white font-semibold px-8 py-3 rounded-lg hover:border-gray-400 transition-colors"
             >
-              Start selling
+              {sellHref === "/vendor-dashboard"
+                ? "Go to dashboard"
+                : "Start selling"}
             </Link>
           </div>
         </div>

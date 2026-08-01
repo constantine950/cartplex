@@ -91,8 +91,7 @@ export function Footer() {
         </div>
 
         <div className="border-t border-gray-200 mt-8 pt-8 text-sm text-gray-400 text-center">
-          © {new Date().getFullYear()} CartPlex. Built with Next.js, GraphQL &
-          Stripe.
+          © {new Date().getFullYear()} CartPlex
         </div>
       </div>
     </footer>
