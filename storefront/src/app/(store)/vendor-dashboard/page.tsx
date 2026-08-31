@@ -55,7 +55,11 @@ function getToken() {
 
 export default function VendorDashboardPage() {
   const { data, loading } = useQuery(VENDOR_OVERVIEW, {
-    context: { headers: { Authorization: `Bearer ${getToken()}` } },
+    context: {
+      headers: {
+        Authorization: `Bearer ${typeof window !== "undefined" ? (localStorage.getItem("cartplex_token") ?? "") : ""}`,
+      },
+    },
   });
 
   const vendor = data?.me?.vendor;

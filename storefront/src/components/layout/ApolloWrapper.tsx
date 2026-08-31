@@ -27,22 +27,19 @@ const client = new ApolloClient({
   cache: new InMemoryCache({
     typePolicies: {
       Cart: {
-        // Cart is keyed by sessionId not id
-        keyFields: ["sessionId"],
-      },
-      Query: {
-        fields: {
-          cart: {
-            // Always fetch fresh cart data
-            merge: false,
-          },
-        },
+        keyFields: false,
       },
     },
   }),
   defaultOptions: {
     watchQuery: {
-      fetchPolicy: "cache-and-network",
+      fetchPolicy: "network-only",
+    },
+    query: {
+      fetchPolicy: "network-only",
+    },
+    mutate: {
+      fetchPolicy: "network-only",
     },
   },
 });

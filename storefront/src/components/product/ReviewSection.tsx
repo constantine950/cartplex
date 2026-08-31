@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, gql } from "@apollo/client";
+import Link from "next/link";
 
 const CREATE_REVIEW = gql`
   mutation CreateReview($input: CreateReviewInput!) {
@@ -39,11 +40,24 @@ export function ReviewSection({
   const [text, setText] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [hoverRating, setHoverRating] = useState(0);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  useEffect(() => {
+    setIsLoggedIn(!!localStorage.getItem("cartplex_token"));
+  }, []);
 
   const [createReview, { loading }] = useMutation(CREATE_REVIEW, {
+    context: {
+      headers: {
+        Authorization: `Bearer ${typeof window !== "undefined" ? localStorage.getItem("cartplex_token") : ""}`,
+      },
+    },
     onCompleted: () => {
       setSubmitted(true);
       setShowForm(false);
+    },
+    onError: (err) => {
+      console.error("Review error:", err.message);
     },
   });
 
@@ -70,11 +84,7 @@ export function ReviewSection({
                 {[1, 2, 3, 4, 5].map((star) => (
                   <span
                     key={star}
-                    className={`text-xl ${
-                      star <= Math.round(avgRating)
-                        ? "text-yellow-400"
-                        : "text-gray-200"
-                    }`}
+                    className={`text-xl ${star <= Math.round(avgRating) ? "text-yellow-400" : "text-gray-200"}`}
                   >
                     ★
                   </span>
@@ -88,14 +98,22 @@ export function ReviewSection({
           )}
         </div>
 
-        {!submitted && (
-          <button
-            onClick={() => setShowForm(!showForm)}
-            className="text-sm font-medium border border-gray-200 px-4 py-2 rounded-lg hover:border-gray-400 transition-colors"
-          >
-            Write a review
-          </button>
-        )}
+        {!submitted &&
+          (isLoggedIn ? (
+            <button
+              onClick={() => setShowForm(!showForm)}
+              className="text-sm font-medium border border-gray-200 px-4 py-2 rounded-lg hover:border-gray-400 transition-colors"
+            >
+              Write a review
+            </button>
+          ) : (
+            <Link
+              href="/account/login"
+              className="text-sm font-medium border border-gray-200 px-4 py-2 rounded-lg hover:border-gray-400 transition-colors"
+            >
+              Sign in to review
+            </Link>
+          ))}
       </div>
 
       {/* Rating breakdown */}
@@ -107,7 +125,7 @@ export function ReviewSection({
               <span className="text-yellow-400 text-sm">★</span>
               <div className="flex-1 bg-gray-100 rounded-full h-2">
                 <div
-                  className="bg-yellow-400 h-2 rounded-full transition-all"
+                  className="bg-yellow-400 h-2 rounded-full"
                   style={{
                     width: reviews.length
                       ? `${(count / reviews.length) * 100}%`
@@ -122,13 +140,12 @@ export function ReviewSection({
       )}
 
       {/* Review form */}
-      {showForm && (
+      {showForm && isLoggedIn && (
         <form
           onSubmit={handleSubmit}
           className="bg-gray-50 rounded-xl p-6 mb-8"
         >
           <h3 className="font-medium mb-4">Your review</h3>
-
           <div className="mb-4">
             <p className="text-sm text-gray-600 mb-2">Rating</p>
             <div className="flex gap-1">
@@ -154,15 +171,13 @@ export function ReviewSection({
               ))}
             </div>
           </div>
-
           <textarea
             value={text}
             onChange={(e) => setText(e.target.value)}
-            placeholder="Share your experience with this product..."
+            placeholder="Share your experience..."
             rows={4}
             className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 resize-none"
           />
-
           <div className="flex gap-3 mt-4">
             <button
               type="submit"
@@ -188,7 +203,6 @@ export function ReviewSection({
         </div>
       )}
 
-      {/* Reviews list */}
       {reviews.length === 0 ? (
         <p className="text-gray-500 text-sm">
           No reviews yet. Be the first to review this product.
@@ -216,11 +230,7 @@ export function ReviewSection({
                     {[1, 2, 3, 4, 5].map((star) => (
                       <span
                         key={star}
-                        className={`text-sm ${
-                          star <= review.rating
-                            ? "text-yellow-400"
-                            : "text-gray-200"
-                        }`}
+                        className={`text-sm ${star <= review.rating ? "text-yellow-400" : "text-gray-200"}`}
                       >
                         ★
                       </span>

@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 const GET_CART = gql`
   query GetCart($sessionId: String!) {
     cart(sessionId: $sessionId) {
+      sessionId
       items {
         name
         quantity
