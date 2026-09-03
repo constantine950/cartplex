@@ -50,8 +50,24 @@ export function ProductCard({ product }: ProductCardProps) {
             sizes="(max-width: 768px) 50vw, 33vw"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-4xl text-gray-300">
-            📦
+          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200">
+            <span className="text-4xl opacity-50">
+              {product.category === "Audio"
+                ? "🎧"
+                : product.category === "Peripherals"
+                  ? "⌨️"
+                  : product.category === "Kitchen"
+                    ? "☕"
+                    : product.category === "Decor"
+                      ? "🕯️"
+                      : product.category === "Outerwear"
+                        ? "🧥"
+                        : product.category === "Footwear"
+                          ? "👟"
+                          : product.category === "Bags"
+                            ? "👜"
+                            : "📦"}
+            </span>
           </div>
         )}
 
