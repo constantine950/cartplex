@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery, useMutation, gql } from "@apollo/client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const GET_COUPONS = gql`
   query AdminCoupons {
@@ -38,13 +38,9 @@ const DISABLE_COUPON = gql`
   }
 `;
 
-function getToken() {
-  if (typeof window === "undefined") return "";
-  return localStorage.getItem("cartplex_token") ?? "";
-}
-
 export default function AdminCoupons() {
   const [showForm, setShowForm] = useState(false);
+  const [token, setToken] = useState("");
   const [form, setForm] = useState({
     code: "",
     type: "PERCENTAGE",
@@ -53,10 +49,15 @@ export default function AdminCoupons() {
     usageLimit: "",
   });
 
-  const ctx = {
-    context: { headers: { Authorization: `Bearer ${getToken()}` } },
-  };
-  const { data, loading, refetch } = useQuery(GET_COUPONS, ctx);
+  useEffect(() => {
+    setToken(localStorage.getItem("cartplex_token") ?? "");
+  }, []);
+
+  const ctx = { context: { headers: { Authorization: `Bearer ${token}` } } };
+  const { data, loading, refetch } = useQuery(GET_COUPONS, {
+    ...ctx,
+    skip: !token,
+  });
   const [createCoupon, { loading: creating }] = useMutation(CREATE_COUPON, {
     ...ctx,
     onCompleted: () => {
@@ -107,7 +108,6 @@ export default function AdminCoupons() {
         </button>
       </div>
 
-      {/* Create form */}
       {showForm && (
         <form
           onSubmit={handleCreate}
@@ -115,20 +115,53 @@ export default function AdminCoupons() {
         >
           <h2 className="font-semibold mb-4">Create Coupon</h2>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">
-                Code
-              </label>
-              <input
-                value={form.code}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, code: e.target.value.toUpperCase() }))
-                }
-                required
-                placeholder="SUMMER20"
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 font-mono"
-              />
-            </div>
+            {[
+              {
+                label: "Code",
+                key: "code",
+                placeholder: "SUMMER20",
+                mono: true,
+              },
+              {
+                label: "Value",
+                key: "value",
+                placeholder: "10",
+                type: "number",
+              },
+              {
+                label: "Min Order ($)",
+                key: "minOrderValue",
+                placeholder: "Optional",
+                type: "number",
+              },
+              {
+                label: "Usage Limit",
+                key: "usageLimit",
+                placeholder: "Unlimited",
+                type: "number",
+              },
+            ].map((field) => (
+              <div key={field.key}>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  {field.label}
+                </label>
+                <input
+                  type={field.type ?? "text"}
+                  value={(form as any)[field.key]}
+                  onChange={(e) =>
+                    setForm((f) => ({
+                      ...f,
+                      [field.key]:
+                        field.key === "code"
+                          ? e.target.value.toUpperCase()
+                          : e.target.value,
+                    }))
+                  }
+                  placeholder={field.placeholder}
+                  className={`w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 ${field.mono ? "font-mono" : ""}`}
+                />
+              </div>
+            ))}
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">
                 Type
@@ -145,49 +178,6 @@ export default function AdminCoupons() {
                 <option value="FREE_SHIPPING">Free Shipping</option>
                 <option value="BOGO">BOGO</option>
               </select>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">
-                Value {form.type === "PERCENTAGE" ? "(%)" : "($)"}
-              </label>
-              <input
-                type="number"
-                value={form.value}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, value: e.target.value }))
-                }
-                required
-                min="0"
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">
-                Min Order ($)
-              </label>
-              <input
-                type="number"
-                value={form.minOrderValue}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, minOrderValue: e.target.value }))
-                }
-                placeholder="Optional"
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">
-                Usage Limit
-              </label>
-              <input
-                type="number"
-                value={form.usageLimit}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, usageLimit: e.target.value }))
-                }
-                placeholder="Unlimited"
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
-              />
             </div>
           </div>
           <div className="flex gap-3 mt-4">
@@ -209,7 +199,6 @@ export default function AdminCoupons() {
         </form>
       )}
 
-      {/* Coupons table */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wide">
@@ -229,13 +218,19 @@ export default function AdminCoupons() {
                   Loading...
                 </td>
               </tr>
+            ) : coupons.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="px-6 py-8 text-center text-gray-400">
+                  No coupons yet.
+                </td>
+              </tr>
             ) : (
               coupons.map((coupon: any) => (
                 <tr
                   key={coupon.id}
                   className="hover:bg-gray-50 transition-colors"
                 >
-                  <td className="px-6 py-4 font-mono font-bold text-gray-900">
+                  <td className="px-6 py-4 font-mono font-bold">
                     {coupon.code}
                   </td>
                   <td className="px-6 py-4 text-gray-500">
@@ -254,11 +249,7 @@ export default function AdminCoupons() {
                   </td>
                   <td className="px-6 py-4">
                     <span
-                      className={`text-xs px-2 py-1 rounded-full font-medium ${
-                        coupon.isActive
-                          ? "bg-green-100 text-green-700"
-                          : "bg-gray-100 text-gray-500"
-                      }`}
+                      className={`text-xs px-2 py-1 rounded-full font-medium ${coupon.isActive ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}
                     >
                       {coupon.isActive ? "Active" : "Disabled"}
                     </span>
@@ -269,7 +260,7 @@ export default function AdminCoupons() {
                         onClick={() =>
                           disableCoupon({ variables: { id: coupon.id } })
                         }
-                        className="text-xs text-red-500 hover:text-red-700 transition-colors"
+                        className="text-xs text-red-500 hover:text-red-700"
                       >
                         Disable
                       </button>

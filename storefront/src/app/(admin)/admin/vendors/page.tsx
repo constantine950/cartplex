@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery, useMutation, gql } from "@apollo/client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const GET_VENDORS = gql`
   query AdminVendors {
@@ -40,11 +40,6 @@ const SUSPEND_VENDOR = gql`
   }
 `;
 
-function getToken() {
-  if (typeof window === "undefined") return "";
-  return localStorage.getItem("cartplex_token") ?? "";
-}
-
 const STATUS_COLOR: Record<string, string> = {
   APPROVED: "bg-green-100 text-green-700",
   PENDING: "bg-yellow-100 text-yellow-700",
@@ -52,12 +47,22 @@ const STATUS_COLOR: Record<string, string> = {
 };
 
 export default function AdminVendors() {
-  const [filter, setFilter] = useState<string>("ALL");
+  const [filter, setFilter] = useState("ALL");
+  const [token, setToken] = useState("");
+
+  useEffect(() => {
+    setToken(localStorage.getItem("cartplex_token") ?? "");
+  }, []);
+
   const ctx = {
-    context: { headers: { Authorization: `Bearer ${getToken()}` } },
+    context: { headers: { Authorization: `Bearer ${token}` } },
   };
 
-  const { data, loading, refetch } = useQuery(GET_VENDORS, ctx);
+  const { data, loading, refetch } = useQuery(GET_VENDORS, {
+    ...ctx,
+    skip: !token,
+  });
+
   const [approve] = useMutation(APPROVE_VENDOR, {
     ...ctx,
     onCompleted: () => refetch(),
@@ -112,6 +117,12 @@ export default function AdminVendors() {
                   Loading...
                 </td>
               </tr>
+            ) : vendors.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="px-6 py-8 text-center text-gray-400">
+                  No vendors found.
+                </td>
+              </tr>
             ) : (
               vendors.map((vendor: any) => (
                 <tr
@@ -132,7 +143,7 @@ export default function AdminVendors() {
                       {vendor.status}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-gray-700 font-medium">
+                  <td className="px-6 py-4 font-medium">
                     {vendor.products?.length ?? 0}
                   </td>
                   <td className="px-6 py-4">

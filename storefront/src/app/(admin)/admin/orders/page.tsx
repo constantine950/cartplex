@@ -26,7 +26,10 @@ const GET_ORDERS = gql`
         }
       }
       payouts {
-        vendorId
+        vendor {
+          id
+          name
+        }
         grossAmount
         platformFee
         netAmount

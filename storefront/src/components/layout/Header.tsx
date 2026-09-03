@@ -100,6 +100,16 @@ export function Header() {
                       <p className="text-xs text-gray-400">{user.email}</p>
                     </div>
 
+                    {user.role === "BUYER" && (
+                      <Link
+                        href="/account/orders"
+                        onClick={() => setDropdownOpen(false)}
+                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                      >
+                        My Orders
+                      </Link>
+                    )}
+
                     {user.role === "VENDOR" && (
                       <Link
                         href="/vendor-dashboard"

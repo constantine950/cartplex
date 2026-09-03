@@ -80,7 +80,12 @@ export default function VendorProductsPage() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">My Products</h1>
-        <p className="text-sm text-gray-400">{products.length} products</p>
+        <Link
+          href="/vendor-dashboard/products/new"
+          className="bg-gray-900 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors"
+        >
+          + New Product
+        </Link>
       </div>
 
       {loading ? (

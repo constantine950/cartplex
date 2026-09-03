@@ -73,6 +73,7 @@ type Vendor {
   stripeOnboardingDone: Boolean
   products: [Product!]!
   createdAt: DateTime
+  user: User
 }
 
 type Product {
@@ -176,6 +177,7 @@ type Coupon {
   usageCount: Int
   expiresAt: DateTime
   isActive: Boolean
+  createdAt: DateTime
 }
 
 type Payout {

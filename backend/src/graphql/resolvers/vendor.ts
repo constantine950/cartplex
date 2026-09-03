@@ -185,6 +185,9 @@ export const vendorResolvers = {
   Vendor: {
     products: (parent: any, _: any, context: ApolloContext) =>
       parent.products ?? context.loaders.productsByVendor.load(parent.id),
+
+    user: (parent: any) =>
+      parent.user ?? prisma.user.findUnique({ where: { id: parent.userId } }),
   },
 
   User: {
