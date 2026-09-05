@@ -21,5 +21,9 @@ RUN bun install --production --trust-all-plugins
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY prisma ./prisma
+
+RUN groupadd --system app && useradd --system --gid app app
+USER app
+
 EXPOSE 4000
 CMD ["bun", "dist/index.js"]
